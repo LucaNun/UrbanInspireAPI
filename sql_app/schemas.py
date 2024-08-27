@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
+from uuid import UUID
 
 class ItemBase(BaseModel):
     title: str
@@ -21,11 +22,12 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: int
     is_active: bool
-    items: List[Item] = []
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-class TokenData(BaseModel):
-    username: str | None = None
+class UserToken(BaseModel):
+    sub: int
+    uid: UUID
+    exp: int
