@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from uuid import UUID
 
@@ -14,9 +14,12 @@ class Item(ItemBase):
     owner_id: int
 
 class UserBase(BaseModel):
-    email: str
+    email: EmailStr
 
 class UserCreate(UserBase):
+    firstname: str
+    lastname: str
+    username: str
     password: str
 
 class User(UserBase):
