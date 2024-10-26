@@ -29,6 +29,19 @@ SECRET_KEY = secret.SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+def validate_password(value):
+        if not any(char.isdigit() for char in value):
+            raise HTTPException(status_code=400, detail="Password must contain at least one digit.")
+        if not any(char.isupper() for char in value):
+            raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter.")
+        if not any(char.islower() for char in value):
+            raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter.")
+        if not any(char in "!@#$%^&*()_+-=[]{}|;':,.<>?/~`" for char in value):
+            raise HTTPException(status_code=400, detail="Password must contain at least one special character.")
+        if not len(value) > 8:
+            raise HTTPException(status_code=400, detail="Password must contain more than 8 characters.")
+        return value
+
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -124,6 +137,7 @@ def is_Auth_Get_Item(current_user: Annotated[schemas.User, Depends(get_current_a
 
 @app.post("/users/", response_model=schemas.User)
 def create_new_user(user: schemas.UserCreate, session: Session = Depends(get_db_session)):
+    validate_password(user.password)
     db_user = db.get_user_by_email(session, user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -150,3 +164,6 @@ def create_item_for_user(user_id: int, item: schemas.ItemCreate, session: Sessio
 def read_items(skip: int = 0, limit: int = 10, session: Session = Depends(get_db_session)):
     items = db.get_items(session, skip=skip, limit=limit)
     return items
+
+
+
