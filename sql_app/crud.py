@@ -41,3 +41,9 @@ def store_user_token(db: Session, user_id: int, uuid: UUID, exp: int):
 def get_user_token_blacklist(db: Session, uuid: UUID):
     statement = select(models.User_Token_Blacklist).join(models.User_Token, models.User_Token_Blacklist.token_id == models.User_Token.id).where(models.User_Token.uuid == uuid)
     return db.exec(statement).all()
+
+def user_token_to_blacklist(db: Session, uuid: UUID, sub: int):
+    item = models.User_Token_Blacklist(token_id=select(models.User_Token.id).where(models.User_Token.uuid == uuid and models.User_Token.user_id == sub))
+    db.add(item)
+    db.commit()
+    db.refresh(item)

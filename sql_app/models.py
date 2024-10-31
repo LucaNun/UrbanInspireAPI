@@ -14,7 +14,8 @@ class User_Feedback(SQLModel, table=True):
     text: str
     
     user: "User" = Relationship(back_populates="feedback")
-    
+
+  
 class Idea(SQLModel, table=True):
     __tablename__ = "Ideas"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -29,7 +30,7 @@ class Idea(SQLModel, table=True):
     owner_id: Optional[int] = Field(default=None, foreign_key="Users.id")
 
     owner: "User" = Relationship(back_populates="ideas")
-    images: List["Idea_Image"] = Relationship(back_populates="idea")
+    #title_img: "Idea_Image" = Relationship(back_populates="idea")
     
     @field_validator("latitude")
     def validate_latitude(cls, value):
@@ -47,6 +48,8 @@ class Idea_Status(SQLModel, table=True):
     __tablename__ = "Idea_Status"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
+    
+    #ideas: "Idea" = Relationship(back_populates="status")
 
 class Idea_Image(SQLModel, table=True):
     __tablename__ = "Idea_Images"
@@ -54,6 +57,9 @@ class Idea_Image(SQLModel, table=True):
     idea_id: Optional[int] = Field(default=None,foreign_key="Ideas.id", ondelete="CASCADE")
     image_path: FilePath
     name: str
+    
+    #idea: "Idea" = Relationship(back_populates="images")
+
 
 class User_Token(SQLModel, table=True):
     __tablename__ = "User_Token"
@@ -75,7 +81,7 @@ class User_Token_Blacklist(SQLModel, table=True):
 class User(SQLModel, table=True):
     __tablename__ = "Users"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_group: int = Field(foreign_key="User_Groups.id", ondelete="CASCADE")
+    user_group: int = Field(default=2, foreign_key="User_Groups.id", ondelete="CASCADE")
     firstname: str
     lastname: str
     username: str
@@ -85,6 +91,7 @@ class User(SQLModel, table=True):
 
     ideas: List[Idea] = Relationship(back_populates="owner")
     tokens: List[User_Token] = Relationship(back_populates="user")
+    feedback: List["User_Feedback"] = Relationship(back_populates="user")
 
 class User_Group(SQLModel, table=True):
     __tablename__ = "User_Groups"
