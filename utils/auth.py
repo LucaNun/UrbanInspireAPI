@@ -73,6 +73,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], sessio
         raise credentials_exception
     result = db.get_user(session, user_id=payload.sub)
     if not result:
+        db.user_token_to_blacklist(uuid=payload.uid, sub=payload.sub)
         raise credentials_exception
     user = schemas.User(**result.model_dump())
     return user
