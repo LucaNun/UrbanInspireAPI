@@ -6,7 +6,7 @@ from sqlmodel import Session
 from sql_app import schemas
 from sql_app import crud as db
 from sql_app.database import create_db_and_tables, get_db_session
-from routers import auth_router
+from routers import auth_router, user_router
 from utils import auth
 
 import secret
@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(auth_router.router, prefix="/auth", tags=["auth"])
+app.include_router(user_router.router, prefix="/user", tags=["user"])
 
 
 
@@ -32,14 +33,6 @@ def is_Auth_Get_Item(current_user: Annotated[schemas.User, Depends(auth.get_curr
 
 
 
-@app.post("/users/", response_model=schemas.User)
-def create_new_user(user: schemas.UserCreate, session: Session = Depends(get_db_session)):
-    auth.validate_password(user.password)
-    db_user = db.get_user_by_email(session, user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    user.password = auth.get_password_hash(password=user.password)
-    return db.create_user(session, user)
 
 @app.get("/users/", response_model=List[schemas.User])
 def read_users(skip: int = 0, limit: int = 10, session: Session = Depends(get_db_session)):

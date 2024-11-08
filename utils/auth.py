@@ -72,9 +72,9 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], sessio
     except InvalidTokenError:
         raise credentials_exception
     result = db.get_user(session, user_id=payload.sub)
-    user = schemas.User(**result.model_dump())
-    if user is None:
+    if not result:
         raise credentials_exception
+    user = schemas.User(**result.model_dump())
     return user
 
 
