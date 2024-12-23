@@ -1,17 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, FilePath
 from typing import Optional, List
 from uuid import UUID
-
-class ItemBase(BaseModel):
-    title: str
-    description: Optional[str] = None
-
-class ItemCreate(ItemBase):
-    pass
-
-class Item(ItemBase):
-    id: int
-    owner_id: int
 
 class UserBase(BaseModel):
     firstname: str
@@ -40,3 +29,35 @@ class UserToken(BaseModel):
     sub: int
     uid: UUID
     exp: int
+    
+    
+class Idea(BaseModel):
+    title: str
+    latitude: float
+    longitude: float
+    nearest_city: str
+    location_radius: float
+    status: int
+    description: str
+
+class Idea_Create(Idea):
+    owner_id: int
+
+class IdeaImage(BaseModel):
+    idea_id: int
+    user_id: int
+    image_path: FilePath
+    name: str
+    
+class IdeaImageCreate(BaseModel):
+    name: str
+
+class IdeaUpdate(BaseModel):
+    id: int
+    title: Optional[str] = None
+    latitude: Optional[float] = None 
+    longitude: Optional[float] = None 
+    nearest_city: Optional[str] = None
+    location_radius: Optional[float] = None
+    status: Optional[int] = None 
+    description: Optional[str] = None

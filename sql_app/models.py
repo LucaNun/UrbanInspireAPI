@@ -2,7 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from pydantic import EmailStr, field_validator, FilePath
 from typing import Optional, List
 from uuid import UUID
-from datetime import timedelta
+from datetime import datetime
 
 
 class User_Feedback(SQLModel, table=True):
@@ -20,17 +20,17 @@ class Idea(SQLModel, table=True):
     __tablename__ = "Ideas"
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
-    title_image: Optional[int] = Field(default=None, foreign_key="Idea_Images.id")
     latitude: float
     longitude: float
     nearest_city: str
     location_radius: float
-    status: Optional[int] = Field(default=None, foreign_key="Idea_Status.id")
+    status_id: Optional[int] = Field(default=None, foreign_key="Idea_Status.id")
     description: Optional[str] = None
     owner_id: Optional[int] = Field(default=None, foreign_key="Users.id")
+    creation_date: datetime = Field(default=datetime.now())
+    modify_date: datetime = Field(default=datetime.now())
 
     owner: "User" = Relationship(back_populates="ideas")
-    #title_img: "Idea_Image" = Relationship(back_populates="idea")
     
     @field_validator("latitude")
     def validate_latitude(cls, value):
@@ -48,18 +48,18 @@ class Idea_Status(SQLModel, table=True):
     __tablename__ = "Idea_Status"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    
-    #ideas: "Idea" = Relationship(back_populates="status")
 
 class Idea_Image(SQLModel, table=True):
     __tablename__ = "Idea_Images"
     id: Optional[int] = Field(default=None, primary_key=True)
-    idea_id: Optional[int] = Field(default=None,foreign_key="Ideas.id", ondelete="CASCADE")
+    user_id: Optional[int] = Field(default=None,foreign_key="Users.id", ondelete="CASCADE")
     image_path: FilePath
     name: str
-    
-    #idea: "Idea" = Relationship(back_populates="images")
 
+class Image_To_Idea(SQLModel, table=True):
+    __tablename__ = "Image_To_Idea"
+    idea_id: Optional[int] = Field(default=None,foreign_key="Ideas.id", ondelete="CASCADE", primary_key=True)
+    image_id: Optional[int] = Field(default=None,foreign_key="Idea_Images.id", ondelete="CASCADE", primary_key=True)
 
 class User_Token(SQLModel, table=True):
     __tablename__ = "User_Token"
@@ -88,6 +88,8 @@ class User(SQLModel, table=True):
     email: EmailStr
     password: str
     is_active: bool = Field(default=True)
+    creation_date: datetime = Field(default=datetime.now())
+    modify_date: datetime = Field(default=datetime.now())
 
     ideas: List[Idea] = Relationship(back_populates="owner")
     tokens: List[User_Token] = Relationship(back_populates="user")
