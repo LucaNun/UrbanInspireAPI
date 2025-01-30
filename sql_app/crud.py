@@ -1,5 +1,6 @@
 from sqlmodel import Session, select
 from . import models, schemas
+from datetime import datetime
 from uuid import  UUID
 
 def get_user(db: Session, user_id: int):
@@ -14,7 +15,7 @@ def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.exec(statement).all()
 
 def create_user(db: Session, user: schemas.UserCreate):
-    db_user = models.User(email=user.email, password=user.password, firstname=user.firstname, lastname=user.lastname, username=user.username)
+    db_user = models.User(email=user.email, password=user.password, firstname=user.firstname, lastname=user.lastname, username=user.username, creation_date=datetime.now(), modify_date=datetime.now())
     db.add(db_user)
     db.commit()
     db.refresh(db_user)

@@ -15,7 +15,11 @@ class User_Feedback(SQLModel, table=True):
     
     user: "User" = Relationship(back_populates="feedback")
 
-  
+class Image_To_Idea(SQLModel, table=True):
+    __tablename__ = "Image_To_Idea"
+    idea_id: Optional[int] = Field(default=None,foreign_key="Ideas.id", ondelete="CASCADE", primary_key=True)
+    image_id: Optional[int] = Field(default=None,foreign_key="Idea_Images.id", ondelete="CASCADE", primary_key=True)
+
 class Idea(SQLModel, table=True):
     __tablename__ = "Ideas"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -27,10 +31,15 @@ class Idea(SQLModel, table=True):
     status_id: Optional[int] = Field(default=None, foreign_key="Idea_Status.id")
     description: Optional[str] = None
     owner_id: Optional[int] = Field(default=None, foreign_key="Users.id")
-    creation_date: datetime = Field(default=datetime.now())
-    modify_date: datetime = Field(default=datetime.now())
+    creation_date: datetime
+    modify_date: datetime
 
     owner: "User" = Relationship(back_populates="ideas")
+    
+    images: list["Idea_Image"] = Relationship(
+        back_populates="idea",
+        link_model=Image_To_Idea
+    )
     
     @field_validator("latitude")
     def validate_latitude(cls, value):
@@ -55,11 +64,12 @@ class Idea_Image(SQLModel, table=True):
     user_id: Optional[int] = Field(default=None,foreign_key="Users.id", ondelete="CASCADE")
     image_path: FilePath
     name: str
+    
+    idea: list[Idea] = Relationship(
+        back_populates="images",
+        link_model=Image_To_Idea
+    )
 
-class Image_To_Idea(SQLModel, table=True):
-    __tablename__ = "Image_To_Idea"
-    idea_id: Optional[int] = Field(default=None,foreign_key="Ideas.id", ondelete="CASCADE", primary_key=True)
-    image_id: Optional[int] = Field(default=None,foreign_key="Idea_Images.id", ondelete="CASCADE", primary_key=True)
 
 class User_Token(SQLModel, table=True):
     __tablename__ = "User_Token"
@@ -88,8 +98,8 @@ class User(SQLModel, table=True):
     email: EmailStr
     password: str
     is_active: bool = Field(default=True)
-    creation_date: datetime = Field(default=datetime.now())
-    modify_date: datetime = Field(default=datetime.now())
+    creation_date: datetime
+    modify_date: datetime
 
     ideas: List[Idea] = Relationship(back_populates="owner")
     tokens: List[User_Token] = Relationship(back_populates="user")

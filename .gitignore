@@ -13,3 +13,4 @@ venv_*/
 ENV/
 env.bak/
 venv.bak/
+images/
