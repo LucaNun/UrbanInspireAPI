@@ -39,7 +39,7 @@ def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     return {"ok": True}
 
 @router.delete("/")
-def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],session: Session = Depends(get_db_session)):
+def delete_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],session: Session = Depends(get_db_session)):
     user = session.get(User, current_user.id)
 
     session.delete(user)
@@ -50,7 +50,7 @@ def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_a
 
 
 @router.post("/feedback")
-def create_new_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], feedback: schemas.UserFeedback, session: Session = Depends(get_db_session)):
+def create_feedback(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], feedback: schemas.UserFeedback, session: Session = Depends(get_db_session)):
     new_feedback = User_Feedback(
         user_id=current_user.id,
         is_positive=feedback.is_positive,
