@@ -9,9 +9,9 @@ class User_Feedback(SQLModel, table=True):
     __tablename__ = "User_Feedback"
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[int] = Field(default=None, foreign_key="Users.id")
-    feedback_value: bool
+    is_positive: bool
     title: str
-    text: str
+    description: str
     
     user: "User" = Relationship(back_populates="feedback")
 

@@ -27,6 +27,9 @@ async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_cur
 
 @router.post("/uploadImage")
 async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],image: UploadFile, image_name: str = Form(), idea_id: int = Form(), session: Session = Depends(get_db_session)):
+    idea = session.get(Idea, idea_id)
+    if idea.owner_id != current_user.id:
+        return HTTPException(status_code=401, detail="You are not the owner!")
     
     if not image.filename.endswith(".jpg"):
         return HTTPException(status_code=400, detail="False image format! Use one of the following: .jpg")

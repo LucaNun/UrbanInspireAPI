@@ -4,7 +4,7 @@ from typing import Annotated
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
-from sql_app.models import User
+from sql_app.models import User, User_Feedback
 from utils import auth
 
 router = APIRouter()
@@ -46,3 +46,18 @@ def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     session.commit()
 
     return {"ok": True}
+
+
+
+@router.post("/feedback")
+def create_new_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], feedback: schemas.UserFeedback, session: Session = Depends(get_db_session)):
+    new_feedback = User_Feedback(
+        user_id=current_user.id,
+        is_positive=feedback.is_positive,
+        title=feedback.title,
+        description=feedback.description
+    )
+    
+    session.add(new_feedback)
+    session.commit()
+    return {'status': True}

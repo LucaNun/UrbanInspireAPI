@@ -29,7 +29,11 @@ class UserToken(BaseModel):
     sub: int
     uid: UUID
     exp: int
-    
+
+class UserFeedback(BaseModel):
+    title: str
+    description: str
+    is_positive: bool
     
 class Idea(BaseModel):
     title: str
