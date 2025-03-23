@@ -22,7 +22,7 @@ from secret import SECRET_KEY
 router = APIRouter()
 
 
-@router.post("/token", dependencies=[Depends(RateLimiter(times=1, seconds=300, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/token", dependencies=[Depends(RateLimiter(times=3, seconds=20, identifier=auth.get_identifyer_for_limiter))])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: Session = Depends(get_db_session)
 ) -> schemas.Token:
