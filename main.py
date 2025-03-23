@@ -2,6 +2,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException
 from typing import List, Annotated
 from sqlmodel import Session
+from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimiter
+import redis.asyncio as redis
 
 from sql_app import schemas
 from sql_app import crud as db
@@ -16,7 +19,10 @@ from config import pwd_context
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
+    redis_c = redis.from_url(f"redis://{secret.REDIS_IP}", encoding="utf8", decode_responses=True)
+    await FastAPILimiter.init(redis_c)
     yield
+    await redis_c.close()
 
 app = FastAPI(lifespan=lifespan)
 

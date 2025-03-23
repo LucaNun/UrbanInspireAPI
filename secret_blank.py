@@ -5,3 +5,5 @@ SECRET_KEY = ""
 DB_USER = ""
 DB_PASSWORD = ""
 DB_IP = ""
+
+REDIS_IP = ""

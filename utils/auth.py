@@ -85,3 +85,15 @@ async def get_current_active_user(
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+async def get_identifyer_for_limiter(request):
+    token = request.headers.get("Authorization")
+    token = token.split(" ")[1]
+    user_id = None
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = payload.get("sub")
+        except InvalidTokenError:
+            pass
+    return user_id or request.client.host

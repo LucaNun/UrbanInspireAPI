@@ -5,6 +5,7 @@ from typing import Annotated
 import shutil, json
 from uuid import uuid4
 from datetime import datetime
+from fastapi_limiter.depends import RateLimiter
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
@@ -13,7 +14,7 @@ from utils import auth
 
 router = APIRouter()
 
-@router.post("/")
+@router.post("/", dependencies=[Depends(RateLimiter(times=1, seconds=30, identifier=auth.get_identifyer_for_limiter))])
 async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],new_idea: schemas.Idea, session: Session = Depends(get_db_session)):
     new_idea = schemas.Idea_Create(**new_idea.model_dump(), owner_id=current_user.id)
     new_idea = Idea(**new_idea.model_dump())
@@ -25,7 +26,7 @@ async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_cur
     return {"status": True, "idea_id": new_idea.id}
 
 
-@router.post("/uploadImage")
+@router.post("/uploadImage", dependencies=[Depends(RateLimiter(times=20, seconds=30, identifier=auth.get_identifyer_for_limiter))])
 async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],image: UploadFile, image_name: str = Form(), idea_id: int = Form(), session: Session = Depends(get_db_session)):
     idea = session.get(Idea, idea_id)
     if idea.owner_id != current_user.id:
@@ -53,7 +54,7 @@ async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_cu
     return {"status": True}
 
 
-@router.patch("/")
+@router.patch("/", dependencies=[Depends(RateLimiter(times=1, seconds=20, identifier=auth.get_identifyer_for_limiter))])
 def update_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], update_items: schemas.IdeaUpdate, session: Session = Depends(get_db_session)):
     idea = session.get(Idea, update_items.id)
     
@@ -72,7 +73,7 @@ def update_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     return {"status": True}
 
 
-@router.delete("/")
+@router.delete("/", dependencies=[Depends(RateLimiter(times=1, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def delete_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int = Form(),session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
     
@@ -88,7 +89,7 @@ def delete_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     return {"ok": True}
 
 
-@router.get("/{id}")
+@router.get("/{id}", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],id: int, session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
     
@@ -102,7 +103,7 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
     return idea
 
 
-@router.get("/ideas/")
+@router.get("/ideas/", dependencies=[Depends(RateLimiter(times=50, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], sortdesc: bool = False, lastID: int = None, status: list[int] = Query(), session: Session = Depends(get_db_session)):  
     if not lastID:
         if sortdesc:
@@ -125,7 +126,7 @@ def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_act
     return allIdeas
 
 
-@router.get("/image/{imagename}")
+@router.get("/image/{imagename}", dependencies=[Depends(RateLimiter(times=100, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], imagename: str, session: Session = Depends(get_db_session)):
     return FileResponse("images/" + imagename)
 
