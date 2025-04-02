@@ -88,10 +88,10 @@ async def get_current_active_user(
 
 async def get_identifyer_for_limiter(request):
     token = request.headers.get("Authorization")
-    token = token.split(" ")[1]
     user_id = None
     if token:
         try:
+            token = token.split(" ")[1]
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id = payload.get("sub")
         except InvalidTokenError:
