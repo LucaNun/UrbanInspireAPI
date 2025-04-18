@@ -40,7 +40,7 @@ def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     session.commit()
     session.refresh(user)
 
-    return {"ok": True}
+    return {"status": True}
 
 @router.delete("/", dependencies=[Depends(RateLimiter(times=1, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def delete_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],session: Session = Depends(get_db_session)):
@@ -49,7 +49,7 @@ def delete_user(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     session.delete(user)
     session.commit()
 
-    return {"ok": True}
+    return {"status": True}
 
 @router.post("/feedback", dependencies=[Depends(RateLimiter(times=1, seconds=30, identifier=auth.get_identifyer_for_limiter))])
 def create_feedback(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], feedback: schemas.UserFeedback, session: Session = Depends(get_db_session)):

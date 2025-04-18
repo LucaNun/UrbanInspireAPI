@@ -86,7 +86,7 @@ def delete_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     session.delete(idea)
     session.commit()
 
-    return {"ok": True}
+    return {"status": True}
 
 
 @router.get("/{id}", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])

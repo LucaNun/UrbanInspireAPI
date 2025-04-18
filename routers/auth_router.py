@@ -61,4 +61,4 @@ async def logout_and_block_token(current_user: Annotated[schemas.User, Depends(g
     except InvalidTokenError:
         raise credentials_exception
     
-    return True
+    return {"status": True}
