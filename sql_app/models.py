@@ -28,7 +28,7 @@ class Idea(SQLModel, table=True):
     longitude: float
     nearest_city: str
     location_radius: float
-    status_id: Optional[int] = Field(default=None, foreign_key="Idea_Status.id")
+    status_id: Optional[int] = Field(default=1, foreign_key="Idea_Status.id")
     description: Optional[str] = None
     owner_id: Optional[int] = Field(default=None, foreign_key="Users.id")
     creation_date: datetime
