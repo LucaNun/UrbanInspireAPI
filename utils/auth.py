@@ -94,6 +94,11 @@ async def get_identifyer_for_limiter(request):
             token = token.split(" ")[1]
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id = payload.get("sub")
+            return user_id
         except InvalidTokenError:
             pass
-    return user_id or request.client.host
+    
+    if not user_id:
+        forwarded = request.headers.get("x-forwarded-for")
+        client_ip = forwarded.split(",")[0].strip() if forwarded else request.client.host
+        return client_ip
