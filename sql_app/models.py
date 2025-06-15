@@ -70,6 +70,11 @@ class Idea_Image(SQLModel, table=True):
         link_model=Image_To_Idea
     )
 
+class Idea_Likes(SQLModel, table=True):
+    __tablename__ = "Idea_Likes"
+    idea_id: int = Field(foreign_key="Ideas.id", primary_key=True)
+    user_id: int = Field(foreign_key="Users.id", primary_key=True)
+    like: bool
 
 class User_Token(SQLModel, table=True):
     __tablename__ = "User_Token"
