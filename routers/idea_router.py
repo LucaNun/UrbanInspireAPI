@@ -9,7 +9,7 @@ from fastapi_limiter.depends import RateLimiter
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
-from sql_app.models import Idea, Idea_Image, Image_To_Idea
+from sql_app.models import Idea, Idea_Image, Image_To_Idea, Idea_Likes
 from utils import auth
 
 router = APIRouter()
@@ -130,3 +130,40 @@ def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_act
 def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], imagename: str, session: Session = Depends(get_db_session)):
     return FileResponse("images/" + imagename)
 
+@router.get("/{id}/like", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+def get_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
+    like = session.get(Idea_Likes, [id, current_user.id])
+    
+    return {"idea": like}
+
+@router.post("/{id}/like", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, like: bool, session: Session = Depends(get_db_session)):
+    idea = session.get(Idea, id)
+    if not idea:
+        return HTTPException(status_code=404, detail="Idea not found!")
+        
+    liked = session.get(Idea_Likes, [id, current_user.id])
+    
+    if liked:
+        if like == liked.like:
+            pass
+        else:
+            liked.like = like
+            session.commit()
+    else:
+        like = Idea_Likes(idea_id=id, user_id=current_user.id, like=like)
+        session.add(like)
+        session.commit() 
+        
+    return {"status": True}
+
+@router.delete("/{id}/like", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+def delete_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
+    like = session.get(Idea_Likes, [id, current_user.id])
+    if like:
+        session.delete(like)
+        session.commit()
+    else:
+        return HTTPException(status_code=404, detail="Like not found!")
+    
+    return {"status": True}

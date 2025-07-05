@@ -36,7 +36,7 @@ async def login_for_access_token(
     uuid = uuid4()
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id, "uid": str(uuid)}, expires_delta=access_token_expires
+        data={"sub": str(user.id), "uid": str(uuid)}, expires_delta=access_token_expires
     )
     exp = datetime.now() + access_token_expires
     db.store_user_token(session, user_id=user.id, uuid=uuid, exp=exp.timestamp())
