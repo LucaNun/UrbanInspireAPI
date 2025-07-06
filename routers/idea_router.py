@@ -134,10 +134,12 @@ def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_act
 def get_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
     like = session.get(Idea_Likes, [id, current_user.id])
     
-    return {"idea": like}
+    if not like:
+        return {"like": like}
+    return {"like": like.like}
 
 @router.post("/{id}/like", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
-def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, like: bool, session: Session = Depends(get_db_session)):
+def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, like: bool = Form(), session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
     if not idea:
         return HTTPException(status_code=404, detail="Idea not found!")
