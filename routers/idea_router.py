@@ -9,7 +9,7 @@ from fastapi_limiter.depends import RateLimiter
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
-from sql_app.models import Idea, Idea_Image, Image_To_Idea, Idea_Likes
+from sql_app.models import Idea, Idea_Image, Image_To_Idea, Idea_Likes, Idea_Status
 from utils import auth
 
 router = APIRouter()
@@ -96,9 +96,11 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
     if not idea:
         return HTTPException(status_code=404, detail="Idea not found!")
 
+    status = session.get(Idea_Status, idea.status_id)
     images = idea.images
     idea = json.loads(idea.model_dump_json())
     idea["images"] = images
+    idea["status_name"] = status.name
 
     return idea
 
