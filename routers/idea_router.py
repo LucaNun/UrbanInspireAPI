@@ -122,6 +122,8 @@ def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_act
     allIdeas = []
     for x, id in enumerate(ids):
         idea = session.get(Idea, id)
+        status = session.get(Idea_Status, idea.status_id)
+        idea["status_name"] = status.name
         allIdeas.append(json.loads(idea.model_dump_json()))
         allIdeas[x]["images"] = idea.images
 
