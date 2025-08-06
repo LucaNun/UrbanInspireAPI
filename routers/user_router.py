@@ -2,11 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from typing import Annotated 
 from fastapi_limiter.depends import RateLimiter
+from uuid import uuid4, UUID
+from fastapi_mail import MessageSchema, MessageType
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
-from sql_app.models import User, User_Feedback
+from sql_app.models import User, User_Feedback, User_Activation
 from utils import auth
+from utils.mail import fm
 
 router = APIRouter()
 
@@ -16,7 +19,7 @@ async def get_user(current_user: Annotated[schemas.User, Depends(auth.get_curren
     return user
 
 @router.post("/", response_model=schemas.UserBase, dependencies=[Depends(RateLimiter(times=1, seconds=60, identifier=auth.get_identifyer_for_limiter))])
-def create_new_user(
+async def create_new_user(
     user: schemas.UserCreate,
     session: Session = Depends(get_db_session)
 ):
@@ -25,7 +28,27 @@ def create_new_user(
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     user.password = auth.get_password_hash(password=user.password)
-    return db.create_user(session, user)
+    
+    created_user = db.create_user(session, user)
+    uuid = uuid4()
+    activation_code = User_Activation(user_id=created_user.id, uuid=uuid)
+    session.add(activation_code)
+    session.commit()
+    try:
+        html = f"<p>Jetzt EMail bestätigen!</p><br>https://urban.berellsoft.dev/user/activate/{uuid}"
+        
+        message = MessageSchema(
+            subject="Bestätige deinen Account",
+            recipients=[user.email],
+            body=html,
+            subtype=MessageType.html,
+        )
+        await fm.send_message(message)
+    
+    except Exception as e:
+        print(f"Fehler beim E-Mail-Versand: {e}")
+    
+    return created_user
 
 @router.patch("/", dependencies=[Depends(RateLimiter(times=1, seconds=30, identifier=auth.get_identifyer_for_limiter))])
 def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], update_items: schemas.UserUpdate,session: Session = Depends(get_db_session)):
@@ -63,3 +86,15 @@ def create_feedback(current_user: Annotated[schemas.User, Depends(auth.get_curre
     session.add(new_feedback)
     session.commit()
     return {'status': True}
+
+@router.get("/activate/{id}")
+async def simple_send(id: UUID, session: Session = Depends(get_db_session)):
+    ua = session.get(User_Activation,id)
+    if not ua:
+        return {'status': False}
+    user = session.get(User, ua.user_id)
+    user.is_active = True
+    session.delete(ua)
+    session.commit()
+    return {'status': True}
+

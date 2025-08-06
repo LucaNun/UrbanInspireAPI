@@ -102,13 +102,19 @@ class User(SQLModel, table=True):
     username: str
     email: EmailStr
     password: str
-    is_active: bool = Field(default=True)
+    is_active: bool = Field(default=False)
     creation_date: datetime
     modify_date: datetime
 
     ideas: List[Idea] = Relationship(back_populates="owner")
     tokens: List[User_Token] = Relationship(back_populates="user")
     feedback: List["User_Feedback"] = Relationship(back_populates="user")
+    
+class User_Activation(SQLModel, table=True):
+    __tablename__ = "User_Activation"
+    user_id: Optional[int] = Field(default=None,foreign_key="Users.id", ondelete="CASCADE")
+    uuid: UUID = Field(primary_key=True)
+
 
 class User_Group(SQLModel, table=True):
     __tablename__ = "User_Groups"
