@@ -35,7 +35,7 @@ async def create_new_user(
     session.add(activation_code)
     session.commit()
     try:
-        html = f"<p>Jetzt EMail bestätigen!</p><br>https://urban.berellsoft.dev/user/activate/{uuid}"
+        html = f"""<p>Jetzt <a href="https://urban.berellsoft.dev/user/activate/{uuid}">EMail bestätigen!</a></p>"""
         
         message = MessageSchema(
             subject="Bestätige deinen Account",
@@ -47,6 +47,7 @@ async def create_new_user(
     
     except Exception as e:
         print(f"Fehler beim E-Mail-Versand: {e}")
+        return created_user
     
     return created_user
 
