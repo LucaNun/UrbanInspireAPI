@@ -33,6 +33,7 @@ class Idea(SQLModel, table=True):
     owner_id: Optional[int] = Field(default=None, foreign_key="Users.id")
     creation_date: datetime
     modify_date: datetime
+    category: Optional[int] = Field(default=1, foreign_key="Idea_Categorys.id")
 
     owner: "User" = Relationship(back_populates="ideas")
     
@@ -76,6 +77,11 @@ class Idea_Likes(SQLModel, table=True):
     user_id: int = Field(foreign_key="Users.id", primary_key=True)
     like: bool
 
+class Idea_Categorys(SQLModel, table=True):
+    __tablename__ = "Idea_Categorys"
+    id: int = Field(default=None, primary_key=True)
+    name: str
+    
 class User_Token(SQLModel, table=True):
     __tablename__ = "User_Token"
     id: Optional[int] = Field(default=None, primary_key=True)

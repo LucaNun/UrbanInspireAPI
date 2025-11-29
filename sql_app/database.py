@@ -1,6 +1,6 @@
 from sqlmodel import create_engine, SQLModel, Session, select
 import secret
-from sql_app.models import User_Group, Idea_Status
+from sql_app.models import User_Group, Idea_Status, Idea_Categorys
 
 DATABASE_URL = f"postgresql://{secret.DB_USER}:{secret.DB_PASSWORD}@{secret.DB_IP}/UrbanInspire"
 
@@ -43,7 +43,29 @@ def insert_data():
 
             # Änderungen speichern
             session.commit()
+        
+        statement = select(Idea_Categorys)
+        result = session.exec(statement).first()
+        
+        if not result:
+            default = Idea_Categorys(name="nicht zugewiesen")
+            gebaude = Idea_Categorys(name="Gebäude")
+            vaeranstaltung = Idea_Categorys(name="Veranstaltung")
+            festival = Idea_Categorys(name="Festival")
+            restaurant = Idea_Categorys(name="Restaurant")
+            sonstige = Idea_Categorys(name="Sonstige")
+            
+            session.add(default)
+            session.add(gebaude)
+            session.add(vaeranstaltung)
+            session.add(festival)
+            session.add(restaurant)
+            session.add(sonstige)
 
+            # Änderungen speichern
+            session.commit()
+        
+        
 def get_db_session():
     with Session(engine) as session:
         yield session

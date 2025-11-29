@@ -43,6 +43,7 @@ class Idea(BaseModel):
     location_radius: float
     status: int
     description: str
+    category: int
 
 class Idea_Create(Idea):
     owner_id: int
@@ -65,3 +66,10 @@ class IdeaUpdate(BaseModel):
     location_radius: Optional[float] = None
     status: Optional[int] = None 
     description: Optional[str] = None
+    
+class IdeaCategory(BaseModel):
+    id: int
+    name: str
+
+class IdeaCategoryWithUsage(IdeaCategory):
+    usage: float

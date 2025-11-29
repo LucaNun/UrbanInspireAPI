@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Query
 from fastapi.responses import FileResponse
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from typing import Annotated 
 import shutil, json
 from uuid import uuid4
@@ -9,7 +9,7 @@ from fastapi_limiter.depends import RateLimiter
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
-from sql_app.models import Idea, Idea_Image, Image_To_Idea, Idea_Likes, Idea_Status
+from sql_app.models import Idea, Idea_Image, Image_To_Idea, Idea_Likes, Idea_Status, Idea_Categorys
 from utils import auth
 
 router = APIRouter()
@@ -88,6 +88,21 @@ def delete_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_a
 
     return {"status": True}
 
+@router.get("/categorys", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+def get_idea_categorys(session: Session = Depends(get_db_session)):
+    statement = (
+        select(
+            Idea_Categorys.name,
+            Idea_Categorys.id,
+            (func.count(Idea.id) * 100.0 / select(func.count(Idea.id)).select_from(Idea)).label("percentage")
+        )
+        .select_from(Idea_Categorys)
+        .outerjoin(Idea, Idea.category == Idea_Categorys.id)
+        .group_by(Idea_Categorys.id, Idea_Categorys.name)
+    )
+    categorys = session.exec(statement).all()
+    categorys = [schemas.IdeaCategoryWithUsage(name=row[0], id=row[1], usage=row[2]) for row in categorys]
+    return categorys
 
 @router.get("/{id}", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],id: int, session: Session = Depends(get_db_session)):
@@ -98,9 +113,11 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
 
     status = session.get(Idea_Status, idea.status_id)
     images = idea.images
+    cat = session.get(Idea_Categorys, idea.category)
     idea = json.loads(idea.model_dump_json())
     idea["images"] = images
     idea["status_name"] = status.name
+    idea["category_name"] = cat.name
 
     return idea
 
