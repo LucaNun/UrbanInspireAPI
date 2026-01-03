@@ -148,6 +148,12 @@ def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_act
 
     return allIdeas
 
+@router.get("/ideas/status", dependencies=[Depends(RateLimiter(times=50, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+def get_ideas( session: Session = Depends(get_db_session)) -> list[schemas.IdeasStatus]:
+    statement = select(Idea_Status).where(Idea_Status.public)
+    status = session.exec(statement)
+    return status
+
 
 @router.get("/image/{imagename}", dependencies=[Depends(RateLimiter(times=100, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], imagename: str, session: Session = Depends(get_db_session)):

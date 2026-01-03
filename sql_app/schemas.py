@@ -73,3 +73,7 @@ class IdeaCategory(BaseModel):
 
 class IdeaCategoryWithUsage(IdeaCategory):
     usage: float
+
+class IdeasStatus(BaseModel):
+    id: int
+    name: str

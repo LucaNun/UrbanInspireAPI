@@ -58,6 +58,7 @@ class Idea_Status(SQLModel, table=True):
     __tablename__ = "Idea_Status"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
+    public: bool = Field(default=False)
 
 class Idea_Image(SQLModel, table=True):
     __tablename__ = "Idea_Images"
