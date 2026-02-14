@@ -123,17 +123,22 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
 
 
 @router.get("/ideas/", dependencies=[Depends(RateLimiter(times=50, seconds=60, identifier=auth.get_identifyer_for_limiter))])
-def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], sortdesc: bool = False, lastID: int = None, status: list[int] = Query(), session: Session = Depends(get_db_session)):  
-    if not lastID:
-        if sortdesc:
-            statement = select(Idea.id).order_by(Idea.id.desc()).limit(1)
-        else:
-            statement = select(Idea.id).order_by(Idea.id.asc()).limit(1)
-        lastID = session.exec(statement).first()
+def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], sortdesc: bool = False, lastID: int = None, status: list[int] = Query(), category: list[int] | None = Query(default=None), session: Session = Depends(get_db_session)):
+    if lastID is None:
+        order = Idea.id.desc() if sortdesc else Idea.id.asc()
+        lastID = session.exec(select(Idea.id).order_by(order).limit(1)).first()
+    
+    statement = select(Idea.id).where(Idea.status_id.in_(status))
+
+    if category:
+        statement = statement.where(Idea.category_id.in_(category))
+        
     if sortdesc:
-        statement = select(Idea.id).where(Idea.status_id.in_(status)).where(Idea.id <= lastID).order_by(Idea.creation_date.desc()).limit(10)
+        statement = statement.where(Idea.id <= lastID).order_by(Idea.creation_date.desc())
     else:
-        statement = select(Idea.id).where(Idea.status_id.in_(status)).where(Idea.id >= lastID).order_by(Idea.creation_date.asc()).limit(10)
+        statement = statement.where(Idea.id >= lastID).order_by(Idea.creation_date.asc())
+
+    statement = statement.limit(10)
     ids = session.exec(statement).all()
     
     allIdeas = []

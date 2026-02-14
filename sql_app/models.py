@@ -33,7 +33,7 @@ class Idea(SQLModel, table=True):
     owner_id: Optional[int] = Field(default=None, foreign_key="Users.id")
     creation_date: datetime
     modify_date: datetime
-    category: Optional[int] = Field(default=1, foreign_key="Idea_Categorys.id")
+    category_id: Optional[int] = Field(default=1, foreign_key="Idea_Categorys.id")
 
     owner: "User" = Relationship(back_populates="ideas")
     
