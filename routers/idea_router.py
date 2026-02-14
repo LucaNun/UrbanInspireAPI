@@ -97,7 +97,7 @@ def get_idea_categorys(session: Session = Depends(get_db_session)):
             (func.count(Idea.id) * 100.0 / select(func.count(Idea.id)).select_from(Idea)).label("percentage")
         )
         .select_from(Idea_Categorys)
-        .outerjoin(Idea, Idea.category == Idea_Categorys.id)
+        .outerjoin(Idea, Idea.category_id == Idea_Categorys.id)
         .group_by(Idea_Categorys.id, Idea_Categorys.name)
     )
     categorys = session.exec(statement).all()
