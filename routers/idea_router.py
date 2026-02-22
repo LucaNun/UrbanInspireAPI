@@ -113,7 +113,7 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
 
     status = session.get(Idea_Status, idea.status_id)
     images = idea.images
-    cat = session.get(Idea_Categorys, idea.category)
+    cat = session.get(Idea_Categorys, idea.category_id)
     idea = json.loads(idea.model_dump_json())
     idea["images"] = images
     idea["status_name"] = status.name

@@ -35,7 +35,7 @@ async def login_for_access_token(
         )
     if not user.is_active:
         raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
+        status_code=status.HTTP_423_LOCKED,
         detail="Account not activated",
         ) 
         
