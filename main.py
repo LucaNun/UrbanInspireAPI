@@ -5,6 +5,7 @@ import redis.asyncio as redis
 
 from sql_app.database import insert_data, get_db_session
 from routers import auth_router, user_router, idea_router
+from config import PRODUCTION
 
 import secret
 
@@ -17,7 +18,12 @@ async def lifespan(app: FastAPI):
     yield
     await redis_c.close()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    docs_url=None if PRODUCTION else "/docs",
+    redoc_url=None if PRODUCTION else "redoc",
+    openapi_url=None if PRODUCTION else "/openapi.json"    
+)
 
 app.include_router(auth_router.router, prefix="/auth", tags=["auth"])
 app.include_router(user_router.router, prefix="/user", tags=["user"])
