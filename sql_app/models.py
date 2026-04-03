@@ -127,3 +127,18 @@ class User_Group(SQLModel, table=True):
     __tablename__ = "User_Groups"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
+
+
+class ResetEmailValidation(SQLModel, table=True):
+    __tablename__ = "Reset_Email_Validation"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None,foreign_key="Users.id", ondelete="CASCADE")
+    code: int
+    ttl: datetime
+
+class ResetPassword(SQLModel, table=True):
+    __tablename__ = "Reset_Password"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None,foreign_key="Users.id", ondelete="CASCADE")
+    code: UUID
+    ttl: datetime

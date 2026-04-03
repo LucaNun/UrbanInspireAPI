@@ -6,6 +6,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto",)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 PRODUCTION = True
+PASSWORD_RESET_TOKEN_TTL_MINUTES = 60
 
 
 mail_conf = ConnectionConfig(

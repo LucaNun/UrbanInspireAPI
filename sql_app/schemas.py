@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr, FilePath
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, FilePath, Field
+from typing import Optional, List, Annotated
 from uuid import UUID
+import re
 
 class UserBase(BaseModel):
     firstname: str
@@ -77,3 +78,14 @@ class IdeaCategoryWithUsage(IdeaCategory):
 class IdeasStatus(BaseModel):
     id: int
     name: str
+
+
+# Password Reset
+class UserEmail(BaseModel):
+    email: EmailStr
+class ResetCodeConfirmation(UserEmail):
+    code: Annotated[str, Field(pattern=r'^\d{6}$')]
+class ResetCode(BaseModel):
+    code: UUID
+class ResetPassword(ResetCode):
+    password: str

@@ -1,15 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
+from sqlmodel import Session, select
 from typing import Annotated 
 from fastapi_limiter.depends import RateLimiter
 from uuid import uuid4, UUID
 from fastapi_mail import MessageSchema, MessageType
+import random
+from datetime import datetime, timedelta
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
-from sql_app.models import User, User_Feedback, User_Activation
+from sql_app.models import User, User_Feedback, User_Activation, ResetEmailValidation, ResetPassword
 from utils import auth
 from utils.mail import fm
+from config import PASSWORD_RESET_TOKEN_TTL_MINUTES
 
 router = APIRouter()
 
@@ -60,6 +63,7 @@ def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     update_data = update_items.model_dump(exclude_unset=True)
     
     user.sqlmodel_update(update_data)
+    user.modify_date = datetime.now()
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -98,4 +102,94 @@ async def simple_send(id: UUID, session: Session = Depends(get_db_session)):
     session.delete(ua)
     session.commit()
     return {'status': True}
+
+@router.get("/reset/code")
+async def reset_Get_Code(data: schemas.UserEmail, session: Session = Depends(get_db_session)):
+    user = db.get_user_by_email(session, data.email)
+    if not user:
+        print("nächstes mal")
+        return {"status": True}
+    
+    code = f"{random.randint(0, 999999):06d}"
+    newCode = ResetEmailValidation(
+        code=code,
+        user_id=user.id,
+        ttl=datetime.now() + timedelta(minutes=PASSWORD_RESET_TOKEN_TTL_MINUTES)
+    )
+    session.add(newCode)
+    session.commit()
+    
+    try:
+        html = f"""<h2>Dein Code zum Passwort zurücksetzen</h2><h3>{code}</h3>"""   
+        message = MessageSchema(
+            subject="Passwort zurücksetzen",
+            recipients=[user.email],
+            body=html,
+            subtype=MessageType.html,
+        )
+        await fm.send_message(message)
+    except Exception as e:
+        print(f"Fehler beim E-Mail-Versand: {e}")
+        raise HTTPException(status_code=500, detail="Error")
+    
+    return {"status": True}
+
+@router.post("/reset/code")
+async def reset_Post_Code(data: schemas.ResetCodeConfirmation, session: Session = Depends(get_db_session)):
+    user = db.get_user_by_email(session, data.email)
+    statement = select(ResetEmailValidation).select_from(ResetEmailValidation).where(ResetEmailValidation.code==data.code, ResetEmailValidation.user_id == user.id)
+    row = session.exec(statement).first()
+    
+    if not row:
+        raise HTTPException(status_code=401, detail="email and code not matched!")
+    
+    if  row.ttl < datetime.now():
+        code = session.get(ResetEmailValidation, row.id)
+        session.delete(code)
+        session.commit()
+        raise HTTPException(status_code=403, detail="token is expired")
+        
+    code = session.get(ResetEmailValidation, row.id)
+    session.delete(code)
+    session.commit()
+    uuid = uuid4()
+    newPasswordRequest = ResetPassword(
+        user_id=user.id,
+        code=uuid,
+        ttl=datetime.now() + timedelta(minutes=PASSWORD_RESET_TOKEN_TTL_MINUTES)     
+    )
+    session.add(newPasswordRequest)
+    session.commit()
+    
+    return {"code": uuid}
+
+
+@router.patch("/reset/password")
+async def reset_Password(data: schemas.ResetPassword, session: Session = Depends(get_db_session)):
+    statement = select(ResetPassword).select_from(ResetPassword).where(ResetPassword.code == data.code)
+    row = session.exec(statement).first()
+    if not row:
+        raise HTTPException(status_code=401, detail="the uuid does not exist")
+    
+    if  row.ttl < datetime.now():
+        code = session.get(ResetEmailValidation, row.id)
+        session.delete(code)
+        session.commit()
+        raise HTTPException(status_code=403, detail="token is expired")
+    
+    auth.validate_password(data.password)
+    
+    session.delete(row)
+    session.commit()
+    
+    hashedPassword = auth.get_password_hash(data.password)
+    
+    user = session.get(User, row.user_id)
+    user.password = hashedPassword
+    user.modify_date = datetime.now()
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    
+    return {"status": True}
 
