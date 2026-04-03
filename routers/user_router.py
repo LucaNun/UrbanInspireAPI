@@ -92,6 +92,7 @@ def create_feedback(current_user: Annotated[schemas.User, Depends(auth.get_curre
     session.commit()
     return {'status': True}
 
+# TODO: HTML Webseite zurückgeben
 @router.get("/activate/{id}")
 async def simple_send(id: UUID, session: Session = Depends(get_db_session)):
     ua = session.get(User_Activation,id)
@@ -103,11 +104,10 @@ async def simple_send(id: UUID, session: Session = Depends(get_db_session)):
     session.commit()
     return {'status': True}
 
-@router.get("/reset/code")
+@router.post("/reset")
 async def reset_Get_Code(data: schemas.UserEmail, session: Session = Depends(get_db_session)):
     user = db.get_user_by_email(session, data.email)
     if not user:
-        print("nächstes mal")
         return {"status": True}
     
     code = f"{random.randint(0, 999999):06d}"
