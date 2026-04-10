@@ -1,20 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
-from typing import Annotated 
+from typing import Annotated
 from fastapi_limiter.depends import RateLimiter
 from uuid import uuid4, UUID
 from fastapi_mail import MessageSchema, MessageType
 import secrets
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
 from sql_app.models import User, User_Feedback, User_Activation, ResetEmailValidation, ResetPassword
 from utils import auth
 from utils.mail import fm
-from config import PASSWORD_RESET_TOKEN_TTL_MINUTES
+from config import PASSWORD_RESET_TOKEN_TTL_MINUTES, API_DOMAIN
 
 router = APIRouter()
+
+_TEMPLATES = Path(__file__).parent.parent / "templates"
+
+def _load_template(name: str) -> str:
+    return (_TEMPLATES / name).read_text(encoding="utf-8")
 
 @router.get("/", response_model=schemas.UserBase, dependencies=[Depends(RateLimiter(times=1, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 async def get_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], session: Session = Depends(get_db_session)):
@@ -38,10 +45,10 @@ async def create_new_user(
     session.add(activation_code)
     session.commit()
     try:
-        html = f"""<p>Jetzt <a href="https://urban.berellsoft.dev/user/activate/{uuid}">EMail bestätigen!</a></p>"""
-        
+        activation_url = f"{API_DOMAIN}/user/activate/{uuid}"
+        html = _load_template("activation_email.html").replace("{activation_url}", activation_url)
         message = MessageSchema(
-            subject="Bestätige deinen Account",
+            subject="Bestätige deinen Account – UrbanInspire",
             recipients=[user.email],
             body=html,
             subtype=MessageType.html,
@@ -92,17 +99,16 @@ def create_feedback(current_user: Annotated[schemas.User, Depends(auth.get_curre
     session.commit()
     return {'status': True}
 
-# TODO: HTML Webseite zurückgeben
-@router.get("/activate/{id}")
-async def simple_send(id: UUID, session: Session = Depends(get_db_session)):
-    ua = session.get(User_Activation,id)
+@router.get("/activate/{id}", response_class=HTMLResponse)
+async def activate_account(id: UUID, session: Session = Depends(get_db_session)):
+    ua = session.get(User_Activation, id)
     if not ua:
-        return {'status': False}
+        return HTMLResponse(content=_load_template("activation_error.html"), status_code=404)
     user = session.get(User, ua.user_id)
     user.is_active = True
     session.delete(ua)
     session.commit()
-    return {'status': True}
+    return HTMLResponse(content=_load_template("activation_success.html"))
 
 @router.post("/reset", dependencies=[Depends(RateLimiter(times=3, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 async def reset_Get_Code(data: schemas.UserEmail, session: Session = Depends(get_db_session)):

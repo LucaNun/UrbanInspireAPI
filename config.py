@@ -8,6 +8,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 PRODUCTION = True
 PASSWORD_RESET_TOKEN_TTL_MINUTES = 60
 
+API_DOMAIN = "https://urban.sbln.dev"
+
 
 mail_conf = ConnectionConfig(
     MAIL_USERNAME = secret.MAIL_USERNAME,
