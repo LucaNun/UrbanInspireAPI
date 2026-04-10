@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Q
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select, func
 from typing import Annotated 
-import shutil, json
+import shutil, json, os
 from uuid import uuid4
 from datetime import datetime
 from fastapi_limiter.depends import RateLimiter
@@ -32,8 +32,13 @@ async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_cu
     if idea.owner_id != current_user.id:
         return HTTPException(status_code=401, detail="You are not the owner!")
     
-    if not image.filename.endswith(".jpg"):
-        return HTTPException(status_code=400, detail="False image format! Use one of the following: .jpg")
+    if not image.filename.endswith(".jpg") or image.content_type != "image/jpeg":
+        raise HTTPException(status_code=400, detail="False image format! Use one of the following: .jpg")
+
+    header = await image.read(3)
+    await image.seek(0)
+    if header != b'\xff\xd8\xff':
+        raise HTTPException(status_code=400, detail="File content is not a valid JPEG image.")
     
     filename = str(uuid4())
     filename += ".jpg"
@@ -164,7 +169,11 @@ def get_ideas( session: Session = Depends(get_db_session)) -> list[schemas.Ideas
 
 @router.get("/image/{imagename}", dependencies=[Depends(RateLimiter(times=100, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], imagename: str, session: Session = Depends(get_db_session)):
-    return FileResponse("images/" + imagename)
+    safe_name = os.path.basename(imagename)
+    path = os.path.join("images", safe_name)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Image not found.")
+    return FileResponse(path)
 
 @router.get("/{id}/like", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
 def get_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):

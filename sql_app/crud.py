@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, and_
 from . import models, schemas
 from datetime import datetime
 from uuid import  UUID
@@ -37,7 +37,14 @@ def get_user_token_blacklist(db: Session, uuid: UUID):
     return db.exec(statement).all()
 
 def user_token_to_blacklist(db: Session, uuid: UUID, sub: int):
-    item = models.User_Token_Blacklist(token_id=select(models.User_Token.id).where(models.User_Token.uuid == uuid and models.User_Token.user_id == sub))
+    token = db.exec(
+        select(models.User_Token).where(
+            and_(models.User_Token.uuid == uuid, models.User_Token.user_id == sub)
+        )
+    ).first()
+    if not token:
+        return
+    item = models.User_Token_Blacklist(token_id=token.id)
     db.add(item)
     db.commit()
     db.refresh(item)

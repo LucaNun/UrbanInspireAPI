@@ -22,7 +22,7 @@ from secret import SECRET_KEY
 router = APIRouter()
 
 
-@router.post("/token", dependencies=[Depends(RateLimiter(times=3, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/token", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: Session = Depends(get_db_session)
 ) -> schemas.Token:
@@ -48,7 +48,7 @@ async def login_for_access_token(
     db.store_user_token(session, user_id=user.id, uuid=uuid, exp=exp.timestamp())
     return schemas.Token(access_token=access_token, token_type="bearer")
 
-@router.post("/logout", dependencies=[Depends(RateLimiter(times=1, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/logout", dependencies=[Depends(RateLimiter(times=4, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 async def logout_and_block_token(current_user: Annotated[schemas.User, Depends(get_current_active_user)], token: Annotated[str, Depends(oauth2_scheme)], session: Session = Depends(get_db_session)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

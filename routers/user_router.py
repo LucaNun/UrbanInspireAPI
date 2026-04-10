@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi_limiter.depends import RateLimiter
 from uuid import uuid4, UUID
 from fastapi_mail import MessageSchema, MessageType
-import random
+import secrets
 from datetime import datetime, timedelta
 
 from sql_app import schemas, crud as db
@@ -104,13 +104,13 @@ async def simple_send(id: UUID, session: Session = Depends(get_db_session)):
     session.commit()
     return {'status': True}
 
-@router.post("/reset")
+@router.post("/reset", dependencies=[Depends(RateLimiter(times=3, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 async def reset_Get_Code(data: schemas.UserEmail, session: Session = Depends(get_db_session)):
     user = db.get_user_by_email(session, data.email)
     if not user:
         return {"status": True}
     
-    code = f"{random.randint(0, 999999):06d}"
+    code = f"{secrets.randbelow(1000000):06d}"
     newCode = ResetEmailValidation(
         code=code,
         user_id=user.id,
@@ -134,9 +134,11 @@ async def reset_Get_Code(data: schemas.UserEmail, session: Session = Depends(get
     
     return {"status": True}
 
-@router.post("/reset/code")
+@router.post("/reset/code", dependencies=[Depends(RateLimiter(times=5, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 async def reset_Post_Code(data: schemas.ResetCodeConfirmation, session: Session = Depends(get_db_session)):
     user = db.get_user_by_email(session, data.email)
+    if not user:
+        raise HTTPException(status_code=401, detail="email and code not matched!")
     statement = select(ResetEmailValidation).select_from(ResetEmailValidation).where(ResetEmailValidation.code==data.code, ResetEmailValidation.user_id == user.id)
     row = session.exec(statement).first()
     
