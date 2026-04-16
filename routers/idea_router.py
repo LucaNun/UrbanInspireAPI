@@ -176,12 +176,22 @@ def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_act
     return FileResponse(path)
 
 @router.get("/{id}/like", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
-def get_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
+def get_like_for_user_and_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
     like = session.get(Idea_Likes, [id, current_user.id])
     
     if not like:
         return {"like": like}
     return {"like": like.like}
+
+@router.get("/{id}/likes", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+def get_likes_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
+    statement = select(
+        func.count(Idea_Likes.user_id).filter(Idea_Likes.like == True).label("likes"),
+        func.count(Idea_Likes.user_id).filter(Idea_Likes.like == False).label("dislikes")
+    ).where(Idea_Likes.idea_id == id)
+    result = session.exec(statement).first()
+
+    return {"likes": result.likes, "dislikes": result.dislikes}
 
 @router.post("/{id}/like", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, like: bool = Form(), session: Session = Depends(get_db_session)):
