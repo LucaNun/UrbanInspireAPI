@@ -36,7 +36,23 @@ async def create_new_user(
     auth.validate_password(user.password)
     db_user = db.get_user_by_email(session, user.email)
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        try:
+            html = _load_template("email_already_registered.html")
+            message = MessageSchema(
+                subject="Account bereits vorhanden – UrbanInspire",
+                recipients=[user.email],
+                body=html,
+                subtype=MessageType.html,
+            )
+            await fm.send_message(message)
+        except Exception as e:
+            print(f"Fehler beim E-Mail-Versand: {e}")
+        return schemas.UserBase(
+            firstname=db_user.firstname,
+            lastname=db_user.lastname,
+            username=db_user.username,
+            email=db_user.email,
+        )
     user.password = auth.get_password_hash(password=user.password)
     
     created_user = db.create_user(session, user)
@@ -126,9 +142,9 @@ async def reset_Get_Code(data: schemas.UserEmail, session: Session = Depends(get
     session.commit()
     
     try:
-        html = f"""<h2>Dein Code zum Passwort zurücksetzen</h2><h3>{code}</h3>"""   
+        html = _load_template("reset_code_email.html").replace("{reset_code}", code).replace("{ttl_minutes}", str(PASSWORD_RESET_TOKEN_TTL_MINUTES))
         message = MessageSchema(
-            subject="Passwort zurücksetzen",
+            subject="Passwort zurücksetzen – UrbanInspire",
             recipients=[user.email],
             body=html,
             subtype=MessageType.html,
@@ -198,6 +214,18 @@ async def reset_Password(data: schemas.ResetPassword, session: Session = Depends
     session.add(user)
     session.commit()
     session.refresh(user)
-    
+
+    try:
+        html = _load_template("password_reset_success_email.html")
+        message = MessageSchema(
+            subject="Passwort erfolgreich geändert – UrbanInspire",
+            recipients=[user.email],
+            body=html,
+            subtype=MessageType.html,
+        )
+        await fm.send_message(message)
+    except Exception as e:
+        print(f"Fehler beim E-Mail-Versand: {e}")
+
     return {"status": True}
 
