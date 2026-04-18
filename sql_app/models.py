@@ -1,8 +1,22 @@
 from sqlmodel import SQLModel, Field, Relationship
-from pydantic import EmailStr, field_validator, FilePath
-from typing import Optional, List
+from pydantic import EmailStr, field_validator, FilePath, GetCoreSchemaHandler
+from pydantic_core import core_schema
+from typing import Optional, List, Any
 from uuid import UUID
 from datetime import datetime
+from sqlalchemy import Column
+from geoalchemy2 import Geography
+
+
+class _Geography:
+    """Wrapper so pydantic-core always serializes the PostGIS column as None."""
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source_type: Any, handler: GetCoreSchemaHandler):
+        return core_schema.no_info_plain_validator_function(
+            lambda v: v,
+            serialization=core_schema.plain_serializer_function_ser_schema(lambda v: None),
+        )
 
 
 class User_Feedback(SQLModel, table=True):
@@ -34,14 +48,18 @@ class Idea(SQLModel, table=True):
     creation_date: datetime
     modify_date: datetime
     category_id: Optional[int] = Field(default=1, foreign_key="Idea_Categorys.id")
+    location: Optional[_Geography] = Field(
+        default=None,
+        sa_column=Column(Geography(geometry_type='POINT', srid=4326), nullable=True),
+    )
 
     owner: "User" = Relationship(back_populates="ideas")
-    
+
     images: list["Idea_Image"] = Relationship(
         back_populates="idea",
         link_model=Image_To_Idea
     )
-    
+
     @field_validator("latitude")
     def validate_latitude(cls, value):
         if not (-90 <= value <= 90):

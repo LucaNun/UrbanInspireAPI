@@ -1,11 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Query
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select, func
-from typing import Annotated 
+from sqlalchemy import cast
+from typing import Annotated
 import shutil, json, os
 from uuid import uuid4
 from datetime import datetime
 from fastapi_limiter.depends import RateLimiter
+from geoalchemy2 import Geography
+from geoalchemy2.functions import ST_DWithin, ST_Distance, ST_MakePoint, ST_SetSRID
+from geoalchemy2.shape import from_shape
+from shapely.geometry import Point
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
@@ -14,12 +19,29 @@ from utils import auth
 
 router = APIRouter()
 
+def idea_to_dict(idea: Idea) -> dict:
+    return {
+        "id": idea.id,
+        "title": idea.title,
+        "latitude": idea.latitude,
+        "longitude": idea.longitude,
+        "nearest_city": idea.nearest_city,
+        "location_radius": idea.location_radius,
+        "status_id": idea.status_id,
+        "description": idea.description,
+        "owner_id": idea.owner_id,
+        "creation_date": idea.creation_date,
+        "modify_date": idea.modify_date,
+        "category_id": idea.category_id,
+    }
+
 @router.post("/", dependencies=[Depends(RateLimiter(times=1, seconds=30, identifier=auth.get_identifyer_for_limiter))])
 async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],new_idea: schemas.Idea, session: Session = Depends(get_db_session)):
     new_idea = schemas.Idea_Create(**new_idea.model_dump(), owner_id=current_user.id)
     new_idea = Idea(**new_idea.model_dump())
     new_idea.creation_date = datetime.now()
     new_idea.modify_date = datetime.now()
+    new_idea.location = from_shape(Point(new_idea.longitude, new_idea.latitude), srid=4326)
     session.add(new_idea)
     session.commit()
     session.refresh(new_idea)
@@ -70,6 +92,8 @@ def update_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     update_data = update_items.model_dump(exclude_unset=True)
     
     idea.sqlmodel_update(update_data)
+    if update_items.latitude is not None or update_items.longitude is not None:
+        idea.location = from_shape(Point(idea.longitude, idea.latitude), srid=4326)
     idea.modify_date = datetime.now()
     session.add(idea)
     session.commit()
@@ -108,6 +132,43 @@ def get_idea_categorys(session: Session = Depends(get_db_session)):
     categorys = session.exec(statement).all()
     categorys = [schemas.IdeaCategoryWithUsage(name=row[0], id=row[1], usage=row[2]) for row in categorys]
     return categorys
+
+@router.get("/ideas/nearby", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+def get_ideas_nearby(
+    current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    radius: float = Query(..., gt=0, le=50),
+    session: Session = Depends(get_db_session)
+):
+    user_point = cast(ST_SetSRID(ST_MakePoint(lng, lat), 4326), Geography)
+    distance_expr = ST_Distance(Idea.location, user_point).label("distance_m")
+
+    statement = (
+        select(Idea, distance_expr)
+        .where(Idea.location.isnot(None))
+        .where(ST_DWithin(Idea.location, user_point, radius * 1000))
+        .order_by(distance_expr)
+        .limit(100)
+    )
+    rows = session.exec(statement).all()
+
+    result = []
+    for idea, distance_m in rows:
+        result.append(schemas.IdeaNearbyItem(
+            id=idea.id,
+            title=idea.title,
+            description=idea.description,
+            latitude=idea.latitude,
+            longitude=idea.longitude,
+            nearest_city=idea.nearest_city,
+            location_radius=idea.location_radius,
+            status_id=idea.status_id,
+            category_id=idea.category_id,
+            distance_km=round(distance_m / 1000, 2),
+        ))
+    return result
+
 
 @router.get("/{id}", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],id: int, session: Session = Depends(get_db_session)):
@@ -155,8 +216,8 @@ def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_act
         images = idea.images
         idea = json.loads(idea.model_dump_json())
         idea["status_name"] = status.name
+        idea["images"] = images
         allIdeas.append(idea)
-        allIdeas[x]["images"] = images
 
     return allIdeas
 

@@ -80,6 +80,18 @@ class IdeasStatus(BaseModel):
     name: str
 
 
+class IdeaNearbyItem(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    latitude: float
+    longitude: float
+    nearest_city: str
+    location_radius: float
+    status_id: int
+    category_id: int
+    distance_km: float
+
 # Password Reset
 class UserEmail(BaseModel):
     email: EmailStr
