@@ -141,7 +141,7 @@ def get_ideas_nearby(
     for idea, distance_m in rows:
         result.append(schemas.IdeaNearbyItem(
             **idea.model_dump(exclude={"location"}),
-            images=idea.images,
+            images=[image.model_dump() for image in idea.images],
             distance_km=round(distance_m / 1000, 2),
         ))
     return result
