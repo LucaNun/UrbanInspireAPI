@@ -19,24 +19,8 @@ from utils import auth
 
 router = APIRouter()
 
-def idea_to_dict(idea: Idea) -> dict:
-    return {
-        "id": idea.id,
-        "title": idea.title,
-        "latitude": idea.latitude,
-        "longitude": idea.longitude,
-        "nearest_city": idea.nearest_city,
-        "location_radius": idea.location_radius,
-        "status_id": idea.status_id,
-        "description": idea.description,
-        "owner_id": idea.owner_id,
-        "creation_date": idea.creation_date,
-        "modify_date": idea.modify_date,
-        "category_id": idea.category_id,
-    }
-
 @router.post("/", dependencies=[Depends(RateLimiter(times=1, seconds=30, identifier=auth.get_identifyer_for_limiter))])
-async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],new_idea: schemas.Idea, session: Session = Depends(get_db_session)):
+async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],new_idea: schemas.GetCreateIdea, session: Session = Depends(get_db_session)):
     new_idea = schemas.Idea_Create(**new_idea.model_dump(), owner_id=current_user.id)
     new_idea = Idea(**new_idea.model_dump())
     new_idea.creation_date = datetime.now()
@@ -133,7 +117,7 @@ def get_idea_categorys(session: Session = Depends(get_db_session)):
     categorys = [schemas.IdeaCategoryWithUsage(name=row[0], id=row[1], usage=row[2]) for row in categorys]
     return categorys
 
-@router.get("/ideas/nearby", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/ideas/nearby", response_model=list[schemas.IdeaNearbyItem], dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def get_ideas_nearby(
     current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],
     lat: float = Query(..., ge=-90, le=90),
@@ -156,15 +140,8 @@ def get_ideas_nearby(
     result = []
     for idea, distance_m in rows:
         result.append(schemas.IdeaNearbyItem(
-            id=idea.id,
-            title=idea.title,
-            description=idea.description,
-            latitude=idea.latitude,
-            longitude=idea.longitude,
-            nearest_city=idea.nearest_city,
-            location_radius=idea.location_radius,
-            status_id=idea.status_id,
-            category_id=idea.category_id,
+            **idea.model_dump(exclude={"location"}),
+            images=idea.images,
             distance_km=round(distance_m / 1000, 2),
         ))
     return result
@@ -188,7 +165,7 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
     return idea
 
 
-@router.get("/ideas/", dependencies=[Depends(RateLimiter(times=50, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/ideas/", response_model=list[schemas.IdeaBase], dependencies=[Depends(RateLimiter(times=50, seconds=60, identifier=auth.get_identifyer_for_limiter))])
 def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], sortdesc: bool = False, lastID: int = None, status: list[int] = Query(), category: list[int] | None = Query(default=None), session: Session = Depends(get_db_session)):
     if lastID is None:
         order = Idea.id.desc() if sortdesc else Idea.id.asc()
@@ -214,21 +191,20 @@ def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_act
         if not status.public:
             continue
         images = idea.images
-        idea = json.loads(idea.model_dump_json())
+        idea =  schemas.IdeaBase(**idea.model_dump(exclude={"location"}), images=images)
         idea["status_name"] = status.name
-        idea["images"] = images
         allIdeas.append(idea)
 
     return allIdeas
 
-@router.get("/ideas/status", dependencies=[Depends(RateLimiter(times=50, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/ideas/status", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 def get_ideas( session: Session = Depends(get_db_session)) -> list[schemas.IdeasStatus]:
     statement = select(Idea_Status).where(Idea_Status.public)
     status = session.exec(statement)
     return status
 
 
-@router.get("/image/{imagename}", dependencies=[Depends(RateLimiter(times=100, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/image/{imagename}", dependencies=[Depends(RateLimiter(times=100, seconds=20, identifier=auth.get_identifyer_for_limiter))])
 def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], imagename: str, session: Session = Depends(get_db_session)):
     safe_name = os.path.basename(imagename)
     path = os.path.join("images", safe_name)
@@ -236,7 +212,7 @@ def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_act
         raise HTTPException(status_code=404, detail="Image not found.")
     return FileResponse(path)
 
-@router.get("/{id}/like", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/{id}/like", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 def get_like_for_user_and_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
     like = session.get(Idea_Likes, [id, current_user.id])
     
@@ -244,7 +220,7 @@ def get_like_for_user_and_idea(current_user: Annotated[schemas.User, Depends(aut
         return {"like": like}
     return {"like": like.like}
 
-@router.get("/{id}/likes", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/{id}/likes", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 def get_likes_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
     statement = select(
         func.count(Idea_Likes.user_id).filter(Idea_Likes.like == True).label("likes"),
@@ -254,7 +230,7 @@ def get_likes_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_cu
 
     return {"likes": result.likes, "dislikes": result.dislikes}
 
-@router.post("/{id}/like", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/{id}/like", dependencies=[Depends(RateLimiter(times=30, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, like: bool = Form(), session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
     if not idea:
@@ -275,7 +251,7 @@ def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_
         
     return {"status": True}
 
-@router.delete("/{id}/like", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+@router.delete("/{id}/like", dependencies=[Depends(RateLimiter(times=30, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 def delete_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
     like = session.get(Idea_Likes, [id, current_user.id])
     if like:

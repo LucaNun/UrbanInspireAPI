@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, FilePath, Field
 from typing import Optional, List, Annotated
 from uuid import UUID
+from datetime import datetime
 import re
 
 class UserBase(BaseModel):
@@ -35,8 +36,23 @@ class UserFeedback(BaseModel):
     title: str
     description: str
     is_positive: bool
-    
-class Idea(BaseModel):
+
+class IdeaBase(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    latitude: float
+    longitude: float
+    nearest_city: str
+    location_radius: float
+    status_id: int
+    category_id: int
+    owner_id: int
+    modify_date: datetime
+    creation_date: datetime
+    images: List["IdeaImage"]
+
+class GetCreateIdea(BaseModel):
     title: str
     latitude: float
     longitude: float
@@ -46,7 +62,7 @@ class Idea(BaseModel):
     description: str
     category: int
 
-class Idea_Create(Idea):
+class Idea_Create(GetCreateIdea):
     owner_id: int
 
 class IdeaImage(BaseModel):
@@ -80,17 +96,8 @@ class IdeasStatus(BaseModel):
     name: str
 
 
-class IdeaNearbyItem(BaseModel):
-    id: int
-    title: str
-    description: Optional[str]
-    latitude: float
-    longitude: float
-    nearest_city: str
-    location_radius: float
-    status_id: int
-    category_id: int
-    distance_km: float
+class IdeaNearbyItem(IdeaBase):
+    distance_km: float    
 
 # Password Reset
 class UserEmail(BaseModel):
