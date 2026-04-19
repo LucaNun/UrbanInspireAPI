@@ -159,7 +159,6 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
     cat = session.get(Idea_Categorys, idea.category_id)
     idea = json.loads(idea.model_dump_json())
     idea["images"] = images
-    idea["status_name"] = status.name
     idea["category_name"] = cat.name
 
     return idea
@@ -192,7 +191,6 @@ def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_act
             continue
         images = idea.images
         idea =  schemas.IdeaBase(**idea.model_dump(exclude={"location"}), images=images)
-        idea["status_name"] = status.name
         allIdeas.append(idea)
 
     return allIdeas
