@@ -122,7 +122,7 @@ def get_ideas_nearby(
     current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
-    radius: float = Query(..., gt=0, le=50),
+    radius: float = Query(..., gt=0, le=200),
     session: Session = Depends(get_db_session)
 ):
     user_point = cast(ST_SetSRID(ST_MakePoint(lng, lat), 4326), Geography)
