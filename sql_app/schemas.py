@@ -50,7 +50,7 @@ class IdeaBase(BaseModel):
     owner_id: int
     modify_date: datetime
     creation_date: datetime
-    images: Optional[List["IdeaImage"]] = None
+    images: List["IdeaImage"]
 
 class GetCreateIdea(BaseModel):
     title: str
@@ -66,9 +66,9 @@ class Idea_Create(GetCreateIdea):
     owner_id: int
 
 class IdeaImage(BaseModel):
-    idea_id: int
+    id: int
     user_id: int
-    image_path: FilePath
+    image_path: str
     name: str
     
 class IdeaImageCreate(BaseModel):
