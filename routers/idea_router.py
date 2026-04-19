@@ -123,6 +123,8 @@ def get_ideas_nearby(
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
     radius: float = Query(..., gt=0, le=200),
+    status: list[int] = Query(),
+    category: list[int] | None = Query(default=None),
     session: Session = Depends(get_db_session)
 ):
     user_point = cast(ST_SetSRID(ST_MakePoint(lng, lat), 4326), Geography)
@@ -132,9 +134,12 @@ def get_ideas_nearby(
         select(Idea, distance_expr)
         .where(Idea.location.isnot(None))
         .where(ST_DWithin(Idea.location, user_point, radius * 1000))
+        .where(Idea.status_id.in_(status))
         .order_by(distance_expr)
         .limit(100)
     )
+    if category:
+        statement = statement.where(Idea.category_id.in_(category))
     rows = session.exec(statement).all()
 
     result = []
