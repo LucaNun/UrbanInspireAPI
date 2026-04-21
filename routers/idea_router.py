@@ -159,7 +159,6 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
     if not idea:
         return HTTPException(status_code=404, detail="Idea not found!")
 
-    status = session.get(Idea_Status, idea.status_id)
     images = idea.images
     cat = session.get(Idea_Categorys, idea.category_id)
     idea = json.loads(idea.model_dump_json())

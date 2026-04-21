@@ -45,9 +45,9 @@ class IdeaBase(BaseModel):
     longitude: float
     nearest_city: str
     location_radius: float
-    status_id: int
-    category_id: int
-    owner_id: int
+    status_id: Optional[int]
+    category_id: Optional[int]
+    owner_id: Optional[int]
     modify_date: datetime
     creation_date: datetime
     images: List["IdeaImage"]
