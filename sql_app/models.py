@@ -22,7 +22,7 @@ class _Geography:
 class User_Feedback(SQLModel, table=True):
     __tablename__ = "User_Feedback"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: Optional[int] = Field(default=None, foreign_key="Users.id")
+    user_id: Optional[int] = Field(default=None, foreign_key="Users.id", ondelete="SET NULL", nullable=True)
     is_positive: bool
     title: str
     description: str
@@ -42,12 +42,12 @@ class Idea(SQLModel, table=True):
     longitude: float
     nearest_city: str
     location_radius: float
-    status_id: Optional[int] = Field(default=1, foreign_key="Idea_Status.id")
+    status_id: Optional[int] = Field(default=1, foreign_key="Idea_Status.id", ondelete="SET NULL", nullable=True)
     description: Optional[str] = None
-    owner_id: Optional[int] = Field(default=None, foreign_key="Users.id")
+    owner_id: Optional[int] = Field(default=None, foreign_key="Users.id", ondelete="SET NULL", nullable=True)
     creation_date: datetime
     modify_date: datetime
-    category_id: Optional[int] = Field(default=1, foreign_key="Idea_Categorys.id")
+    category_id: Optional[int] = Field(default=1, foreign_key="Idea_Categorys.id", ondelete="SET NULL", nullable=True)
     location: Optional[_Geography] = Field(
         default=None,
         sa_column=Column(Geography(geometry_type='POINT', srid=4326), nullable=True),
@@ -81,7 +81,7 @@ class Idea_Status(SQLModel, table=True):
 class Idea_Image(SQLModel, table=True):
     __tablename__ = "Idea_Images"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: Optional[int] = Field(default=None,foreign_key="Users.id", ondelete="CASCADE")
+    user_id: Optional[int] = Field(default=None,foreign_key="Users.id", ondelete="SET NULL", nullable=True)
     image_path: FilePath
     name: str
     
@@ -92,8 +92,8 @@ class Idea_Image(SQLModel, table=True):
 
 class Idea_Likes(SQLModel, table=True):
     __tablename__ = "Idea_Likes"
-    idea_id: int = Field(foreign_key="Ideas.id", primary_key=True)
-    user_id: int = Field(foreign_key="Users.id", primary_key=True)
+    idea_id: int = Field(foreign_key="Ideas.id", primary_key=True, ondelete="CASCADE")
+    user_id: int = Field(foreign_key="Users.id", primary_key=True, ondelete="CASCADE")
     like: bool
 
 class Idea_Categorys(SQLModel, table=True):
@@ -121,7 +121,7 @@ class User_Token_Blacklist(SQLModel, table=True):
 class User(SQLModel, table=True):
     __tablename__ = "Users"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_group: int = Field(default=2, foreign_key="User_Groups.id", ondelete="CASCADE")
+    user_group: int = Field(default=2, foreign_key="User_Groups.id", ondelete="SET NULL", nullable=True)
     firstname: str
     lastname: str
     username: str
