@@ -93,7 +93,7 @@ def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_a
 
     return {"status": True}
 
-@router.delete("/", dependencies=[Depends(RateLimiter(times=1, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.delete("/", dependencies=[Depends(RateLimiter(times=10, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 async def delete_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], data: schemas.UserDelete, session: Session = Depends(get_db_session)):
     user = session.get(User, current_user.id)
 
