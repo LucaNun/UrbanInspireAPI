@@ -108,3 +108,6 @@ class ResetCode(BaseModel):
     code: UUID
 class ResetPassword(ResetCode):
     password: str
+
+class UserDelete(BaseModel):
+    password: str

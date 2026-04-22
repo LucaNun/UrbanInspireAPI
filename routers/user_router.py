@@ -94,11 +94,27 @@ def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     return {"status": True}
 
 @router.delete("/", dependencies=[Depends(RateLimiter(times=1, seconds=60, identifier=auth.get_identifyer_for_limiter))])
-def delete_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],session: Session = Depends(get_db_session)):
+async def delete_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], data: schemas.UserDelete, session: Session = Depends(get_db_session)):
     user = session.get(User, current_user.id)
 
+    if not auth.verify_password(data.password, user.password):
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    email = user.email
     session.delete(user)
     session.commit()
+
+    try:
+        html = _load_template("account_deleted_email.html")
+        message = MessageSchema(
+            subject="Account gelöscht – UrbanInspire",
+            recipients=[email],
+            body=html,
+            subtype=MessageType.html,
+        )
+        await fm.send_message(message)
+    except Exception as e:
+        print(f"Fehler beim E-Mail-Versand: {e}")
 
     return {"status": True}
 
