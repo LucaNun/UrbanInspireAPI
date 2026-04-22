@@ -77,7 +77,7 @@ async def create_new_user(
     
     return created_user
 
-@router.patch("/", dependencies=[Depends(RateLimiter(times=1, seconds=30, identifier=auth.get_identifyer_for_limiter))])
+@router.patch("/", dependencies=[Depends(RateLimiter(times=10, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], update_items: schemas.UserUpdate,session: Session = Depends(get_db_session)):
     if update_items.password:
         auth.validate_password(update_items.password)
