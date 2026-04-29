@@ -6,6 +6,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto",)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 PRODUCTION = True
+MIN_VERSION = "1.0.1"
 PASSWORD_RESET_TOKEN_TTL_MINUTES = 60
 
 API_DOMAIN = "https://urban.sbln.dev"

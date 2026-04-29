@@ -38,16 +38,16 @@ async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_cu
     if idea.owner_id != current_user.id:
         raise HTTPException(status_code=401, detail="You are not the owner!")
     
-    if not image.filename.endswith(".jpg") or image.content_type != "image/jpeg":
-        raise HTTPException(status_code=400, detail="False image format! Use one of the following: .jpg")
+    if not image.filename.endswith(".webp") or image.content_type != "image/webp":
+        raise HTTPException(status_code=400, detail="False image format! Use one of the following: .webp")
 
-    header = await image.read(3)
+    header = await image.read(12)
     await image.seek(0)
-    if header != b'\xff\xd8\xff':
-        raise HTTPException(status_code=400, detail="File content is not a valid JPEG image.")
-    
+    if not (header[:4] == b'RIFF' and header[8:12] == b'WEBP'):
+        raise HTTPException(status_code=400, detail="File content is not a valid WebP image.")
+
     filename = str(uuid4())
-    filename += ".jpg"
+    filename += ".webp"
     with open("images/" + filename, "wb") as buffer:
         shutil.copyfileobj(image.file, buffer)
 
