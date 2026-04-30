@@ -149,6 +149,10 @@ async def reset_Get_Code(data: schemas.UserEmail, session: Session = Depends(get
         return {"status": True}
     
     code = f"{secrets.randbelow(1000000):06d}"
+    existing = session.get(ResetEmailValidation, user.id)
+    if existing:
+        session.delete(existing)
+        session.flush()
     newCode = ResetEmailValidation(
         code=code,
         user_id=user.id,
@@ -182,15 +186,13 @@ async def reset_Post_Code(data: schemas.ResetCodeConfirmation, session: Session 
     
     if not row:
         raise HTTPException(status_code=401, detail="email and code not matched!")
-    
-    if  row.ttl < datetime.now():
-        code = session.get(ResetEmailValidation, row.id)
-        session.delete(code)
+
+    if row.ttl < datetime.now():
+        session.delete(row)
         session.commit()
         raise HTTPException(status_code=403, detail="token is expired")
-        
-    code = session.get(ResetEmailValidation, row.id)
-    session.delete(code)
+
+    session.delete(row)
     session.commit()
     uuid = uuid4()
     newPasswordRequest = ResetPassword(
@@ -210,10 +212,9 @@ async def reset_Password(data: schemas.ResetPassword, session: Session = Depends
     row = session.exec(statement).first()
     if not row:
         raise HTTPException(status_code=401, detail="the uuid does not exist")
-    
-    if  row.ttl < datetime.now():
-        code = session.get(ResetEmailValidation, row.id)
-        session.delete(code)
+
+    if row.ttl < datetime.now():
+        session.delete(row)
         session.commit()
         raise HTTPException(status_code=403, detail="token is expired")
     

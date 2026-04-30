@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Q
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select, func
 from sqlalchemy import cast
+from sqlalchemy.orm import selectinload
 from typing import Annotated
 import shutil, json, os
-from uuid import uuid4
+from uuid import uuid4, UUID
 from datetime import datetime
 from fastapi_limiter.depends import RateLimiter
 from geoalchemy2 import Geography
@@ -14,7 +15,7 @@ from shapely.geometry import Point
 
 from sql_app import schemas, crud as db
 from sql_app.database import get_db_session
-from sql_app.models import Idea, Idea_Image, Image_To_Idea, Idea_Likes, Idea_Status, Idea_Categorys
+from sql_app.models import Idea, Idea_Image, Image_To_Idea, Idea_Likes, Idea_Status, Idea_Categories
 from utils import auth
 
 router = APIRouter()
@@ -33,11 +34,11 @@ async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_cur
 
 
 @router.post("/uploadImage", dependencies=[Depends(RateLimiter(times=20, seconds=30, identifier=auth.get_identifyer_for_limiter))])
-async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],image: UploadFile, image_name: str = Form(), idea_id: int = Form(), session: Session = Depends(get_db_session)):
+async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],image: UploadFile, image_name: str = Form(), idea_id: UUID = Form(), session: Session = Depends(get_db_session)):
     idea = session.get(Idea, idea_id)
     if idea.owner_id != current_user.id:
         raise HTTPException(status_code=401, detail="You are not the owner!")
-    
+
     if not image.filename.endswith(".webp") or image.content_type != "image/webp":
         raise HTTPException(status_code=400, detail="False image format! Use one of the following: .webp")
 
@@ -52,11 +53,11 @@ async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_cu
         shutil.copyfileobj(image.file, buffer)
 
     new_image = Idea_Image(user_id=current_user.id, name=image_name, image_path=filename)
-    
+
     session.add(new_image)
     session.commit()
     session.refresh(new_image)
-    
+
     link = Image_To_Idea(image_id=new_image.id, idea_id=idea_id)
     session.add(link)
     session.commit()
@@ -68,13 +69,13 @@ async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_cu
 @router.patch("/", dependencies=[Depends(RateLimiter(times=1, seconds=20, identifier=auth.get_identifyer_for_limiter))])
 def update_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], update_items: schemas.IdeaUpdate, session: Session = Depends(get_db_session)):
     idea = session.get(Idea, update_items.id)
-    
+
     if current_user.id != idea.owner_id:
         return HTTPException(status_code=401, detail="You are not the owner!")
-    
-    
+
+
     update_data = update_items.model_dump(exclude_unset=True)
-    
+
     idea.sqlmodel_update(update_data)
     if update_items.latitude is not None or update_items.longitude is not None:
         idea.location = from_shape(Point(idea.longitude, idea.latitude), srid=4326)
@@ -82,20 +83,20 @@ def update_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     session.add(idea)
     session.commit()
     session.refresh(idea)
-    
+
     return {"status": True}
 
 
 @router.delete("/", dependencies=[Depends(RateLimiter(times=1, seconds=60, identifier=auth.get_identifyer_for_limiter))])
-def delete_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int = Form(),session: Session = Depends(get_db_session)):
+def delete_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID = Form(),session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
-    
+
     if not idea:
         return HTTPException(status_code=404, detail="Idea not found!")
-    
+
     if current_user.id != idea.owner_id:
         return HTTPException(status_code=401, detail="You are not the owner!")
-    
+
     session.delete(idea)
     session.commit()
 
@@ -105,13 +106,13 @@ def delete_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_a
 def get_idea_categorys(session: Session = Depends(get_db_session)):
     statement = (
         select(
-            Idea_Categorys.name,
-            Idea_Categorys.id,
+            Idea_Categories.name,
+            Idea_Categories.id,
             (func.count(Idea.id) * 100.0 / select(func.count(Idea.id)).select_from(Idea)).label("percentage")
         )
-        .select_from(Idea_Categorys)
-        .outerjoin(Idea, Idea.category_id == Idea_Categorys.id)
-        .group_by(Idea_Categorys.id, Idea_Categorys.name)
+        .select_from(Idea_Categories)
+        .outerjoin(Idea, Idea.category_id == Idea_Categories.id)
+        .group_by(Idea_Categories.id, Idea_Categories.name)
     )
     categorys = session.exec(statement).all()
     categorys = [schemas.IdeaCategoryWithUsage(name=row[0], id=row[1], usage=row[2]) for row in categorys]
@@ -153,14 +154,14 @@ def get_ideas_nearby(
 
 
 @router.get("/{id}", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
-def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],id: int, session: Session = Depends(get_db_session)):
+def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],id: UUID, session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
-    
+
     if not idea:
         return HTTPException(status_code=404, detail="Idea not found!")
 
     images = idea.images
-    cat = session.get(Idea_Categorys, idea.category_id)
+    cat = session.get(Idea_Categories, idea.category_id)
     idea = json.loads(idea.model_dump_json())
     idea["images"] = images
     idea["category_name"] = cat.name
@@ -169,35 +170,29 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
 
 
 @router.get("/ideas/", response_model=list[schemas.IdeaBase], dependencies=[Depends(RateLimiter(times=50, seconds=60, identifier=auth.get_identifyer_for_limiter))])
-def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], sortdesc: bool = False, lastID: int = None, status: list[int] = Query(), category: list[int] | None = Query(default=None), session: Session = Depends(get_db_session)):
-    if lastID is None:
-        order = Idea.id.desc() if sortdesc else Idea.id.asc()
-        lastID = session.exec(select(Idea.id).order_by(order).limit(1)).first()
-    
-    statement = select(Idea.id).where(Idea.status_id.in_(status))
+def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], sortdesc: bool = False, skip: int = 0, status: list[int] = Query(), category: list[int] | None = Query(default=None), session: Session = Depends(get_db_session)):
+    statement = (
+        select(Idea)
+        .options(selectinload(Idea.images))
+        .join(Idea_Status, Idea.status_id == Idea_Status.id)
+        .where(Idea_Status.public == True)
+        .where(Idea.status_id.in_(status))
+    )
 
     if category:
         statement = statement.where(Idea.category_id.in_(category))
-        
+
     if sortdesc:
-        statement = statement.where(Idea.id <= lastID).order_by(Idea.creation_date.desc())
+        statement = statement.order_by(Idea.creation_date.desc())
     else:
-        statement = statement.where(Idea.id >= lastID).order_by(Idea.creation_date.asc())
+        statement = statement.order_by(Idea.creation_date.asc())
 
-    statement = statement.limit(10)
-    ids = session.exec(statement).all()
-    
-    allIdeas = []
-    for x, id in enumerate(ids):
-        idea = session.get(Idea, id)
-        status = session.get(Idea_Status, idea.status_id)
-        if not status.public:
-            continue
-        images = [image.model_dump() for image in idea.images]  
-        idea =  schemas.IdeaBase(**idea.model_dump(exclude={"location"}), images=images)
-        allIdeas.append(idea)
+    ideas = session.exec(statement.offset(skip).limit(10)).all()
 
-    return allIdeas
+    return [
+        schemas.IdeaBase(**idea.model_dump(exclude={"location"}), images=[img.model_dump() for img in idea.images])
+        for idea in ideas
+    ]
 
 @router.get("/ideas/status", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 def get_ideas( session: Session = Depends(get_db_session)) -> list[schemas.IdeasStatus]:
@@ -215,15 +210,15 @@ def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_act
     return FileResponse(path)
 
 @router.get("/{id}/like", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
-def get_like_for_user_and_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
+def get_like_for_user_and_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID, session: Session = Depends(get_db_session)):
     like = session.get(Idea_Likes, [id, current_user.id])
-    
+
     if not like:
         return {"like": like}
     return {"like": like.like}
 
 @router.get("/{id}/likes", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
-def get_likes_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
+def get_likes_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID, session: Session = Depends(get_db_session)):
     statement = select(
         func.count(Idea_Likes.user_id).filter(Idea_Likes.like == True).label("likes"),
         func.count(Idea_Likes.user_id).filter(Idea_Likes.like == False).label("dislikes")
@@ -233,13 +228,13 @@ def get_likes_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_cu
     return {"likes": result.likes, "dislikes": result.dislikes}
 
 @router.post("/{id}/like", dependencies=[Depends(RateLimiter(times=30, seconds=10, identifier=auth.get_identifyer_for_limiter))])
-def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, like: bool = Form(), session: Session = Depends(get_db_session)):
+def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID, like: bool = Form(), session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
     if not idea:
         return HTTPException(status_code=404, detail="Idea not found!")
-        
+
     liked = session.get(Idea_Likes, [id, current_user.id])
-    
+
     if liked:
         if like == liked.like:
             pass
@@ -249,17 +244,17 @@ def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_
     else:
         like = Idea_Likes(idea_id=id, user_id=current_user.id, like=like)
         session.add(like)
-        session.commit() 
-        
+        session.commit()
+
     return {"status": True}
 
 @router.delete("/{id}/like", dependencies=[Depends(RateLimiter(times=30, seconds=10, identifier=auth.get_identifyer_for_limiter))])
-def delete_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: int, session: Session = Depends(get_db_session)):
+def delete_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID, session: Session = Depends(get_db_session)):
     like = session.get(Idea_Likes, [id, current_user.id])
     if like:
         session.delete(like)
         session.commit()
     else:
         return HTTPException(status_code=404, detail="Like not found!")
-    
+
     return {"status": True}

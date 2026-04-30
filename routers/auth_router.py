@@ -59,8 +59,7 @@ async def logout_and_block_token(current_user: Annotated[schemas.User, Depends(g
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         payload = schemas.UserToken(**payload)
         
-        blacklist = db.get_user_token_blacklist(session, uuid=payload.uid)
-        if not blacklist:
+        if not db.is_token_blacklisted(session, uuid=payload.uid):
             db.user_token_to_blacklist(session, sub=payload.sub, uuid=payload.uid)
 
 
