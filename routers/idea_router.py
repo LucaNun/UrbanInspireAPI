@@ -20,7 +20,7 @@ from utils import auth
 
 router = APIRouter()
 
-@router.post("/", dependencies=[Depends(RateLimiter(times=1, seconds=30, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/", dependencies=[Depends(RateLimiter(times=1, seconds=10, identifier=auth.get_identifyer_for_limiter))])
 async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],new_idea: schemas.GetCreateIdea, session: Session = Depends(get_db_session)):
     new_idea = schemas.Idea_Create(**new_idea.model_dump(), owner_id=current_user.id)
     new_idea = Idea(**new_idea.model_dump())
@@ -170,7 +170,7 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
 
 
 @router.get("/ideas/", response_model=list[schemas.IdeaBase], dependencies=[Depends(RateLimiter(times=50, seconds=60, identifier=auth.get_identifyer_for_limiter))])
-def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], sortdesc: bool = False, skip: int = 0, status: list[int] = Query(), category: list[int] | None = Query(default=None), session: Session = Depends(get_db_session)):
+def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], sortdesc: bool = False, lastID: UUID | None = None, status: list[int] = Query(), category: list[int] | None = Query(default=None), session: Session = Depends(get_db_session)):
     statement = (
         select(Idea)
         .options(selectinload(Idea.images))
@@ -182,12 +182,23 @@ def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_act
     if category:
         statement = statement.where(Idea.category_id.in_(category))
 
+    if lastID is not None:
+        last_creation_date = (
+            select(Idea.creation_date)
+            .where(Idea.id == lastID)
+            .scalar_subquery()
+        )
+        if sortdesc:
+            statement = statement.where(Idea.creation_date < last_creation_date)
+        else:
+            statement = statement.where(Idea.creation_date > last_creation_date)
+
     if sortdesc:
         statement = statement.order_by(Idea.creation_date.desc())
     else:
         statement = statement.order_by(Idea.creation_date.asc())
 
-    ideas = session.exec(statement.offset(skip).limit(10)).all()
+    ideas = session.exec(statement.limit(10)).all()
 
     return [
         schemas.IdeaBase(**idea.model_dump(exclude={"location"}), images=[img.model_dump() for img in idea.images])
