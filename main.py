@@ -53,7 +53,7 @@ def get_app_version():
 def get_maintenance_status():
     headers = {"Retry-After": str(MAINTENANCE_RETRY_AFTER)} if MAINTENANCE_RETRY_AFTER else {}
     return JSONResponse(
-        status_code=503,
+        status_code=503 if MAINTENANCE_MODE else 200,
         headers=headers,
         content={
             "maintenance": MAINTENANCE_MODE,
