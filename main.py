@@ -51,15 +51,20 @@ def get_app_version():
 
 @app.get("/app/maintenance", tags=["app"])
 def get_maintenance_status():
-    return {
-        "maintenance": MAINTENANCE_MODE,
-        "code": MAINTENANCE_CODE if MAINTENANCE_MODE else None,
-        "message": MAINTENANCE_MESSAGE if MAINTENANCE_MODE else None,
-        "retry_after": MAINTENANCE_RETRY_AFTER if MAINTENANCE_MODE else None,
-        "min_version": MIN_VERSION if MAINTENANCE_MODE else None,
-        "estimated_start": MAINTENANCE_START.isoformat() if MAINTENANCE_START and MAINTENANCE_MODE else None,
-        "estimated_end": MAINTENANCE_END.isoformat() if MAINTENANCE_END and MAINTENANCE_MODE else None,
-    }
+    headers = {"Retry-After": str(MAINTENANCE_RETRY_AFTER)} if MAINTENANCE_RETRY_AFTER else {}
+    return JSONResponse(
+        status_code=503,
+        headers=headers,
+        content={
+            "maintenance": MAINTENANCE_MODE,
+            "code": MAINTENANCE_CODE if MAINTENANCE_MODE else None,
+            "message": MAINTENANCE_MESSAGE if MAINTENANCE_MODE else None,
+            "retry_after": MAINTENANCE_RETRY_AFTER if MAINTENANCE_MODE else None,
+            "min_version": MIN_VERSION if MAINTENANCE_MODE else None,
+            "estimated_start": MAINTENANCE_START.isoformat() if MAINTENANCE_START and MAINTENANCE_MODE else None,
+            "estimated_end": MAINTENANCE_END.isoformat() if MAINTENANCE_END and MAINTENANCE_MODE else None,
+        }
+    )
 
 app.include_router(auth_router.router, prefix="/auth", tags=["auth"])
 app.include_router(user_router.router, prefix="/user", tags=["user"])
