@@ -5,7 +5,7 @@ from sqlalchemy import cast
 from sqlalchemy.orm import selectinload
 from typing import Annotated
 import shutil, json, os
-from uuid import uuid4, UUID
+from uuid import UUID
 from datetime import datetime
 from fastapi_limiter.depends import RateLimiter
 from geoalchemy2 import Geography
@@ -47,12 +47,10 @@ async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_cu
     if not (header[:4] == b'RIFF' and header[8:12] == b'WEBP'):
         raise HTTPException(status_code=400, detail="File content is not a valid WebP image.")
 
-    filename = str(uuid4())
-    filename += ".webp"
-    with open("images/" + filename, "wb") as buffer:
-        shutil.copyfileobj(image.file, buffer)
+    new_image = Idea_Image(user_id=current_user.id, name=image_name)
 
-    new_image = Idea_Image(user_id=current_user.id, name=image_name, image_path=filename)
+    with open(f"images/{new_image.id}.webp", "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
 
     session.add(new_image)
     session.commit()
@@ -212,10 +210,9 @@ def get_ideas( session: Session = Depends(get_db_session)) -> list[schemas.Ideas
     return status
 
 
-@router.get("/image/{imagename}", dependencies=[Depends(RateLimiter(times=100, seconds=20, identifier=auth.get_identifyer_for_limiter))])
-def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], imagename: str, session: Session = Depends(get_db_session)):
-    safe_name = os.path.basename(imagename)
-    path = os.path.join("images", safe_name)
+@router.get("/image/{image_id}", dependencies=[Depends(RateLimiter(times=100, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], image_id: UUID, session: Session = Depends(get_db_session)):
+    path = os.path.join("images", f"{image_id}.webp")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Image not found.")
     return FileResponse(path)

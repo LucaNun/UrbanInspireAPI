@@ -66,9 +66,8 @@ class Idea_Create(GetCreateIdea):
     owner_id: UUID
 
 class IdeaImage(BaseModel):
-    id: int
+    id: UUID
     user_id: UUID
-    image_path: str
     name: str
 
 class IdeaImageCreate(BaseModel):

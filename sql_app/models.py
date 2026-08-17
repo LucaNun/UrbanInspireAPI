@@ -32,7 +32,7 @@ class User_Feedback(SQLModel, table=True):
 class Image_To_Idea(SQLModel, table=True):
     __tablename__ = "Image_To_Idea"
     idea_id: Optional[UUID] = Field(default=None, foreign_key="Ideas.id", ondelete="CASCADE", primary_key=True)
-    image_id: Optional[int] = Field(default=None, foreign_key="Idea_Images.id", ondelete="CASCADE", primary_key=True)
+    image_id: Optional[UUID] = Field(default=None, foreign_key="Idea_Images.id", ondelete="CASCADE", primary_key=True)
 
 class Idea(SQLModel, table=True):
     __tablename__ = "Ideas"
@@ -80,9 +80,8 @@ class Idea_Status(SQLModel, table=True):
 
 class Idea_Image(SQLModel, table=True):
     __tablename__ = "Idea_Images"
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     user_id: Optional[UUID] = Field(default=None, foreign_key="Users.id", ondelete="SET NULL", nullable=True)
-    image_path: str
     name: str
 
     idea: list[Idea] = Relationship(
