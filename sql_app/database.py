@@ -1,6 +1,7 @@
-from sqlmodel import create_engine, SQLModel, Session, select
+from sqlmodel import create_engine, SQLModel, Session, select, delete
 import secret
-from sql_app.models import User_Group, Idea_Status, Idea_Categories
+from sql_app.models import User_Group, Idea_Status, Idea_Categories, User_Token
+from datetime import datetime
 
 DATABASE_URL = f"postgresql://{secret.DB_USER}:{secret.DB_PASSWORD}@{secret.DB_IP}/UrbanInspire"
 
@@ -71,3 +72,14 @@ def insert_data():
 def get_db_session():
     with Session(engine) as session:
         yield session
+
+def cleanup_tokens():
+    print("Running cleanup_tokens job...")
+    with Session(engine) as session:
+        statement = delete(User_Token).where(
+            User_Token.exp < int(datetime.now().timestamp())
+        )
+        result = session.exec(statement)
+        session.commit()
+        print(f"Deleted {result.rowcount} expired tokens")
+    print("Finished cleanup_tokens job")

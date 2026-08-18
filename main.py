@@ -4,20 +4,36 @@ from fastapi.responses import JSONResponse
 from fastapi_limiter import FastAPILimiter
 import redis.asyncio as redis
 
-from sql_app.database import insert_data, get_db_session
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+from sql_app.database import insert_data, get_db_session, cleanup_tokens
 from routers import auth_router, user_router, idea_router
 from config import PRODUCTION, MIN_VERSION, MAINTENANCE_MODE, MAINTENANCE_CODE, MAINTENANCE_MESSAGE, MAINTENANCE_RETRY_AFTER, MAINTENANCE_START, MAINTENANCE_END
 
 import secret
 
-
+scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     insert_data()
+    
+    scheduler.add_job(
+        cleanup_tokens,
+        "interval",
+        minutes=15,
+        id="cleanup_sessions",
+        replace_existing=True,
+    )
+    
     redis_c = redis.from_url(f"redis://{secret.REDIS_IP}", encoding="utf8", decode_responses=True)
     await FastAPILimiter.init(redis_c)
+    scheduler.start()
     yield
+    print("Shutting down...")
+    scheduler.shutdown()
     await redis_c.close()
+    print("Shutting down complete.")
 
 app = FastAPI(
     lifespan=lifespan,
