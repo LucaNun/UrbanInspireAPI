@@ -1,7 +1,7 @@
 from sqlmodel import create_engine, SQLModel, Session, select, delete
 import secret
-from sql_app.models import User_Group, Idea_Status, Idea_Categories, User_Token
-from datetime import datetime
+from sql_app.models import User_Group, Idea_Status, Idea_Categories, User_Token, User, ResetPassword
+from datetime import datetime, timedelta
 
 DATABASE_URL = f"postgresql://{secret.DB_USER}:{secret.DB_PASSWORD}@{secret.DB_IP}/UrbanInspire"
 
@@ -83,3 +83,26 @@ def cleanup_tokens():
         session.commit()
         print(f"Deleted {result.rowcount} expired tokens")
     print("Finished cleanup_tokens job")
+
+def cleanup_unactiveded_users():
+    print("Running cleanup_unactive_users job...")
+    with Session(engine) as session:
+        statement = delete(User).where(
+            User.modify_date < datetime.now() - timedelta(days=30),
+            User.is_active == False
+        )
+        result = session.exec(statement)
+        session.commit()
+        print(f"Deleted {result.rowcount} expired acounts")
+    print("Finished cleanup_unactive_users job")
+    
+def cleanup_unused_password_reset_tokens():
+    print("Running cleanup_unused_password_reset_tokens job...")
+    with Session(engine) as session:
+        statement = delete(ResetPassword).where(
+            ResetPassword.ttl < datetime.now()
+        )
+        result = session.exec(statement)
+        session.commit()
+        print(f"Deleted {result.rowcount} expired password reset tokens")
+    print("Finished cleanup_unused_password_reset_tokens job")

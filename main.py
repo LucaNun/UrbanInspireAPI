@@ -7,7 +7,7 @@ import redis.asyncio as redis
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from sql_app.database import insert_data, get_db_session, cleanup_tokens
+from sql_app.database import insert_data, get_db_session, cleanup_tokens, cleanup_unactiveded_users, cleanup_unused_password_reset_tokens
 from routers import auth_router, user_router, idea_router
 from config import PRODUCTION, MIN_VERSION, MAINTENANCE_MODE, MAINTENANCE_CODE, MAINTENANCE_MESSAGE, MAINTENANCE_RETRY_AFTER, MAINTENANCE_START, MAINTENANCE_END
 
@@ -23,6 +23,22 @@ async def lifespan(app: FastAPI):
         "interval",
         minutes=15,
         id="cleanup_sessions",
+        replace_existing=True,
+    )
+    
+    scheduler.add_job(
+        cleanup_unactiveded_users,
+        "interval",
+        days=1,
+        id="cleanup_unactive_users",
+        replace_existing=True,
+    )
+    
+    scheduler.add_job(
+        cleanup_unused_password_reset_tokens,
+        "interval",
+        days=1,
+        id="cleanup_unused_password_reset_tokens",
         replace_existing=True,
     )
     
