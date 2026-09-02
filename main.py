@@ -1,8 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from fastapi_limiter import FastAPILimiter
-import redis.asyncio as redis
+from utils.rate_limiter import rate_limited
+from utils.redis_client import redis_client
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -10,8 +10,6 @@ from apscheduler.triggers.cron import CronTrigger
 from sql_app.database import insert_data, get_db_session, cleanup_tokens, cleanup_unactiveded_users, cleanup_unused_password_reset_tokens
 from routers import auth_router, user_router, idea_router
 from config import PRODUCTION, MIN_VERSION, MAINTENANCE_MODE, MAINTENANCE_CODE, MAINTENANCE_MESSAGE, MAINTENANCE_RETRY_AFTER, MAINTENANCE_START, MAINTENANCE_END
-
-import secret
 
 scheduler = AsyncIOScheduler()
 @asynccontextmanager
@@ -42,13 +40,11 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
     
-    redis_c = redis.from_url(f"redis://{secret.REDIS_IP}", encoding="utf8", decode_responses=True)
-    await FastAPILimiter.init(redis_c)
     scheduler.start()
     yield
     print("Shutting down...")
     scheduler.shutdown()
-    await redis_c.close()
+    await redis_client.aclose()
     print("Shutting down complete.")
 
 app = FastAPI(
@@ -77,11 +73,11 @@ async def maintenance_middleware(request: Request, call_next):
         )
     return await call_next(request)
 
-@app.get("/app/version", tags=["app"])
+@app.get("/app/version", dependencies=rate_limited("app:version", 10, 20), tags=["app"])
 def get_app_version():
     return {"min_version": MIN_VERSION}
 
-@app.get("/app/maintenance", tags=["app"])
+@app.get("/app/maintenance", dependencies=rate_limited("app:maintenance", 10, 20), tags=["app"])
 def get_maintenance_status():
     headers = {"Retry-After": str(MAINTENANCE_RETRY_AFTER)} if MAINTENANCE_RETRY_AFTER else {}
     return JSONResponse(

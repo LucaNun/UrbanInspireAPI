@@ -7,7 +7,7 @@ from typing import Annotated
 import shutil, json, os
 from uuid import UUID
 from datetime import datetime
-from fastapi_limiter.depends import RateLimiter
+from utils.rate_limiter import rate_limited
 from geoalchemy2 import Geography
 from geoalchemy2.functions import ST_DWithin, ST_Distance, ST_MakePoint, ST_SetSRID
 from geoalchemy2.shape import from_shape
@@ -20,7 +20,7 @@ from utils import auth
 
 router = APIRouter()
 
-@router.post("/", dependencies=[Depends(RateLimiter(times=1, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/", dependencies=rate_limited("idea:create", 3, 10, auth.get_identifyer_for_limiter))
 async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],new_idea: schemas.GetCreateIdea, session: Session = Depends(get_db_session)):
     new_idea = schemas.Idea_Create(**new_idea.model_dump(), owner_id=current_user.id)
     new_idea = Idea(**new_idea.model_dump())
@@ -33,7 +33,7 @@ async def create_idea(current_user: Annotated[schemas.User, Depends(auth.get_cur
     return {"status": True, "idea_id": new_idea.id}
 
 
-@router.post("/uploadImage", dependencies=[Depends(RateLimiter(times=20, seconds=30, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/uploadImage", dependencies=rate_limited("idea:upload_image", 20, 30, auth.get_identifyer_for_limiter))
 async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],image: UploadFile, image_name: str = Form(), idea_id: UUID = Form(), session: Session = Depends(get_db_session)):
     idea = session.get(Idea, idea_id)
     if idea.owner_id != current_user.id:
@@ -64,7 +64,7 @@ async def upload_image(current_user: Annotated[schemas.User, Depends(auth.get_cu
     return {"status": True}
 
 
-@router.patch("/", dependencies=[Depends(RateLimiter(times=1, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+@router.patch("/", dependencies=rate_limited("idea:update", 2, 10, auth.get_identifyer_for_limiter))
 def update_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], update_items: schemas.IdeaUpdate, session: Session = Depends(get_db_session)):
     idea = session.get(Idea, update_items.id)
 
@@ -85,7 +85,7 @@ def update_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_a
     return {"status": True}
 
 
-@router.delete("/", dependencies=[Depends(RateLimiter(times=1, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.delete("/", dependencies=rate_limited("idea:delete", 4, 30, auth.get_identifyer_for_limiter))
 def delete_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID = Form(),session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
 
@@ -100,7 +100,7 @@ def delete_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_a
 
     return {"status": True}
 
-@router.get("/categorys", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/categorys", dependencies=rate_limited("idea:categories", 30, 60, auth.get_identifyer_for_limiter))
 def get_idea_categorys(session: Session = Depends(get_db_session)):
     statement = (
         select(
@@ -116,7 +116,7 @@ def get_idea_categorys(session: Session = Depends(get_db_session)):
     categorys = [schemas.IdeaCategoryWithUsage(name=row[0], id=row[1], usage=row[2]) for row in categorys]
     return categorys
 
-@router.get("/ideas/nearby", response_model=list[schemas.IdeaNearbyItem], dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/ideas/nearby", response_model=list[schemas.IdeaNearbyItem], dependencies=rate_limited("idea:nearby", 30, 60, auth.get_identifyer_for_limiter))
 def get_ideas_nearby(
     current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],
     lat: float = Query(..., ge=-90, le=90),
@@ -151,7 +151,7 @@ def get_ideas_nearby(
     return result
 
 
-@router.get("/{id}", dependencies=[Depends(RateLimiter(times=30, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/{id}", dependencies=rate_limited("idea:get", 30, 60, auth.get_identifyer_for_limiter))
 def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)],id: UUID, session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
 
@@ -167,7 +167,7 @@ def get_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_acti
     return idea
 
 
-@router.get("/ideas/", response_model=list[schemas.IdeaBase], dependencies=[Depends(RateLimiter(times=50, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/ideas/", response_model=list[schemas.IdeaBase], dependencies=rate_limited("idea:list", 50, 60, auth.get_identifyer_for_limiter))
 def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], sortdesc: bool = False, lastID: UUID | None = None, status: list[int] = Query(), category: list[int] | None = Query(default=None), session: Session = Depends(get_db_session)):
     statement = (
         select(Idea)
@@ -203,21 +203,21 @@ def get_ideas(current_user: Annotated[schemas.User, Depends(auth.get_current_act
         for idea in ideas
     ]
 
-@router.get("/ideas/status", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/ideas/status", dependencies=rate_limited("idea:status", 50, 10, auth.get_identifyer_for_limiter))
 def get_ideas( session: Session = Depends(get_db_session)) -> list[schemas.IdeasStatus]:
     statement = select(Idea_Status).where(Idea_Status.public)
     status = session.exec(statement)
     return status
 
 
-@router.get("/image/{image_id}", dependencies=[Depends(RateLimiter(times=100, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/image/{image_id}", dependencies=rate_limited("idea:image", 100, 20, auth.get_identifyer_for_limiter))
 def get_image(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], image_id: UUID, session: Session = Depends(get_db_session)):
     path = os.path.join("images", f"{image_id}.webp")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Image not found.")
     return FileResponse(path)
 
-@router.get("/{id}/like", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/{id}/like", dependencies=rate_limited("idea:like_get", 50, 10, auth.get_identifyer_for_limiter))
 def get_like_for_user_and_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID, session: Session = Depends(get_db_session)):
     like = session.get(Idea_Likes, [id, current_user.id])
 
@@ -225,7 +225,7 @@ def get_like_for_user_and_idea(current_user: Annotated[schemas.User, Depends(aut
         return {"like": like}
     return {"like": like.like}
 
-@router.get("/{id}/likes", dependencies=[Depends(RateLimiter(times=50, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/{id}/likes", dependencies=rate_limited("idea:likes_count", 50, 10, auth.get_identifyer_for_limiter))
 def get_likes_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID, session: Session = Depends(get_db_session)):
     statement = select(
         func.count(Idea_Likes.user_id).filter(Idea_Likes.like == True).label("likes"),
@@ -235,7 +235,7 @@ def get_likes_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_cu
 
     return {"likes": result.likes, "dislikes": result.dislikes}
 
-@router.post("/{id}/like", dependencies=[Depends(RateLimiter(times=30, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/{id}/like", dependencies=rate_limited("idea:like_set", 30, 10, auth.get_identifyer_for_limiter))
 def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID, like: bool = Form(), session: Session = Depends(get_db_session)):
     idea = session.get(Idea, id)
     if not idea:
@@ -256,7 +256,7 @@ def update_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_
 
     return {"status": True}
 
-@router.delete("/{id}/like", dependencies=[Depends(RateLimiter(times=30, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.delete("/{id}/like", dependencies=rate_limited("idea:like_delete", 30, 10, auth.get_identifyer_for_limiter))
 def delete_like_for_idea(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], id: UUID, session: Session = Depends(get_db_session)):
     like = session.get(Idea_Likes, [id, current_user.id])
     if like:
