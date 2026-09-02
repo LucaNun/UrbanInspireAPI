@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, FilePath, Field
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Annotated
 from uuid import UUID
 from datetime import datetime
@@ -18,9 +18,9 @@ class UserUpdate(BaseModel):
     lastname: Optional[str] = None
     username: Optional[str] = None
     password: Optional[str] = None
-  
+
 class User(UserBase):
-    id: int
+    id: UUID
     is_active: bool
 
 class Token(BaseModel):
@@ -28,7 +28,7 @@ class Token(BaseModel):
     token_type: str
 
 class UserToken(BaseModel):
-    sub: int
+    sub: UUID
     uid: UUID
     exp: int
 
@@ -38,7 +38,7 @@ class UserFeedback(BaseModel):
     is_positive: bool
 
 class IdeaBase(BaseModel):
-    id: int
+    id: UUID
     title: str
     description: Optional[str]
     latitude: float
@@ -47,7 +47,7 @@ class IdeaBase(BaseModel):
     location_radius: float
     status_id: Optional[int]
     category_id: Optional[int]
-    owner_id: Optional[int]
+    owner_id: Optional[UUID]
     modify_date: datetime
     creation_date: datetime
     images: List["IdeaImage"]
@@ -63,27 +63,26 @@ class GetCreateIdea(BaseModel):
     category: int
 
 class Idea_Create(GetCreateIdea):
-    owner_id: int
+    owner_id: UUID
 
 class IdeaImage(BaseModel):
-    id: int
-    user_id: int
-    image_path: str
+    id: UUID
+    user_id: UUID
     name: str
-    
+
 class IdeaImageCreate(BaseModel):
     name: str
 
 class IdeaUpdate(BaseModel):
-    id: int
+    id: UUID
     title: Optional[str] = None
-    latitude: Optional[float] = None 
-    longitude: Optional[float] = None 
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     nearest_city: Optional[str] = None
     location_radius: Optional[float] = None
-    status: Optional[int] = None 
+    status: Optional[int] = None
     description: Optional[str] = None
-    
+
 class IdeaCategory(BaseModel):
     id: int
     name: str
@@ -97,7 +96,7 @@ class IdeasStatus(BaseModel):
 
 
 class IdeaNearbyItem(IdeaBase):
-    distance_km: float    
+    distance_km: float
 
 # Password Reset
 class UserEmail(BaseModel):

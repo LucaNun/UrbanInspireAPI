@@ -6,13 +6,13 @@ from uuid import uuid4
 from sqlmodel import Session
 import jwt
 from jwt.exceptions import InvalidTokenError
-from fastapi_limiter.depends import RateLimiter
+from utils.rate_limiter import rate_limited
 
 from sql_app import crud as db
 from sql_app.database import get_db_session
 from sql_app import schemas
 
-from utils.auth import authenticate_user, create_access_token, get_current_active_user,oauth2_scheme
+from utils.auth import authenticate_user, create_access_token, get_current_active_user, oauth2_scheme
 from utils import auth
 
 from config import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM
@@ -22,7 +22,7 @@ from secret import SECRET_KEY
 router = APIRouter()
 
 
-@router.post("/token", dependencies=[Depends(RateLimiter(times=10, seconds=20, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/token", dependencies=rate_limited("auth:token", 10, 20, auth.get_identifyer_for_limiter))
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: Session = Depends(get_db_session)
 ) -> schemas.Token:
@@ -48,7 +48,7 @@ async def login_for_access_token(
     db.store_user_token(session, user_id=user.id, uuid=uuid, exp=exp.timestamp())
     return schemas.Token(access_token=access_token, token_type="bearer")
 
-@router.post("/logout", dependencies=[Depends(RateLimiter(times=4, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/logout", dependencies=rate_limited("auth:logout", 4, 10, auth.get_identifyer_for_limiter))
 async def logout_and_block_token(current_user: Annotated[schemas.User, Depends(get_current_active_user)], token: Annotated[str, Depends(oauth2_scheme)], session: Session = Depends(get_db_session)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -59,8 +59,7 @@ async def logout_and_block_token(current_user: Annotated[schemas.User, Depends(g
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         payload = schemas.UserToken(**payload)
         
-        blacklist = db.get_user_token_blacklist(session, uuid=payload.uid)
-        if not blacklist:
+        if not db.is_token_blacklisted(session, uuid=payload.uid):
             db.user_token_to_blacklist(session, sub=payload.sub, uuid=payload.uid)
 
 

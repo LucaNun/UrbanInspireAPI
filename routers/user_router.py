@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 from typing import Annotated
-from fastapi_limiter.depends import RateLimiter
+from utils.rate_limiter import rate_limited
 from uuid import uuid4, UUID
 from fastapi_mail import MessageSchema, MessageType
 import secrets
@@ -23,12 +23,12 @@ _TEMPLATES = Path(__file__).parent.parent / "templates"
 def _load_template(name: str) -> str:
     return (_TEMPLATES / name).read_text(encoding="utf-8")
 
-@router.get("/", response_model=schemas.UserBase, dependencies=[Depends(RateLimiter(times=1, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.get("/", response_model=schemas.UserBase, dependencies=rate_limited("user:get", 4, 10, auth.get_identifyer_for_limiter))
 async def get_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], session: Session = Depends(get_db_session)):
     user = session.get(User, current_user.id)
     return user
 
-@router.post("/", response_model=schemas.UserBase, dependencies=[Depends(RateLimiter(times=1, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/", response_model=schemas.UserBase, dependencies=rate_limited("user:create", 4, 20, auth.get_identifyer_for_limiter))
 async def create_new_user(
     user: schemas.UserCreate,
     session: Session = Depends(get_db_session)
@@ -77,7 +77,7 @@ async def create_new_user(
     
     return created_user
 
-@router.patch("/", dependencies=[Depends(RateLimiter(times=10, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.patch("/", dependencies=rate_limited("user:update", 10, 10, auth.get_identifyer_for_limiter))
 def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], update_items: schemas.UserUpdate,session: Session = Depends(get_db_session)):
     if update_items.password:
         auth.validate_password(update_items.password)
@@ -93,7 +93,7 @@ def update_user(current_user: Annotated[schemas.User, Depends(auth.get_current_a
 
     return {"status": True}
 
-@router.delete("/", dependencies=[Depends(RateLimiter(times=10, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.delete("/", dependencies=rate_limited("user:delete", 10, 40, auth.get_identifyer_for_limiter))
 async def delete_user(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], data: schemas.UserDelete, session: Session = Depends(get_db_session)):
     user = session.get(User, current_user.id)
 
@@ -118,7 +118,7 @@ async def delete_user(current_user: Annotated[schemas.User, Depends(auth.get_cur
 
     return {"status": True}
 
-@router.post("/feedback", dependencies=[Depends(RateLimiter(times=1, seconds=30, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/feedback", dependencies=rate_limited("user:feedback", 4, 20, auth.get_identifyer_for_limiter))
 def create_feedback(current_user: Annotated[schemas.User, Depends(auth.get_current_active_user)], feedback: schemas.UserFeedback, session: Session = Depends(get_db_session)):
     new_feedback = User_Feedback(
         user_id=current_user.id,
@@ -131,7 +131,7 @@ def create_feedback(current_user: Annotated[schemas.User, Depends(auth.get_curre
     session.commit()
     return {'status': True}
 
-@router.get("/activate/{id}", response_class=HTMLResponse)
+@router.get("/activate/{id}", response_class=HTMLResponse, dependencies=rate_limited("user:activate", 4, 10, auth.get_identifyer_for_limiter))
 async def activate_account(id: UUID, session: Session = Depends(get_db_session)):
     ua = session.get(User_Activation, id)
     if not ua:
@@ -142,13 +142,17 @@ async def activate_account(id: UUID, session: Session = Depends(get_db_session))
     session.commit()
     return HTMLResponse(content=_load_template("activation_success.html"))
 
-@router.post("/reset", dependencies=[Depends(RateLimiter(times=3, seconds=60, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/reset", dependencies=rate_limited("user:reset_request", 5, 30, auth.get_identifyer_for_limiter))
 async def reset_Get_Code(data: schemas.UserEmail, session: Session = Depends(get_db_session)):
     user = db.get_user_by_email(session, data.email)
     if not user:
         return {"status": True}
     
     code = f"{secrets.randbelow(1000000):06d}"
+    existing = session.get(ResetEmailValidation, user.id)
+    if existing:
+        session.delete(existing)
+        session.flush()
     newCode = ResetEmailValidation(
         code=code,
         user_id=user.id,
@@ -172,7 +176,7 @@ async def reset_Get_Code(data: schemas.UserEmail, session: Session = Depends(get
     
     return {"status": True}
 
-@router.post("/reset/code", dependencies=[Depends(RateLimiter(times=5, seconds=10, identifier=auth.get_identifyer_for_limiter))])
+@router.post("/reset/code", dependencies=rate_limited("user:reset_code", 5, 10, auth.get_identifyer_for_limiter))
 async def reset_Post_Code(data: schemas.ResetCodeConfirmation, session: Session = Depends(get_db_session)):
     user = db.get_user_by_email(session, data.email)
     if not user:
@@ -182,15 +186,13 @@ async def reset_Post_Code(data: schemas.ResetCodeConfirmation, session: Session 
     
     if not row:
         raise HTTPException(status_code=401, detail="email and code not matched!")
-    
-    if  row.ttl < datetime.now():
-        code = session.get(ResetEmailValidation, row.id)
-        session.delete(code)
+
+    if row.ttl < datetime.now():
+        session.delete(row)
         session.commit()
         raise HTTPException(status_code=403, detail="token is expired")
-        
-    code = session.get(ResetEmailValidation, row.id)
-    session.delete(code)
+
+    session.delete(row)
     session.commit()
     uuid = uuid4()
     newPasswordRequest = ResetPassword(
@@ -204,16 +206,15 @@ async def reset_Post_Code(data: schemas.ResetCodeConfirmation, session: Session 
     return {"code": uuid}
 
 
-@router.patch("/reset/password")
+@router.patch("/reset/password", dependencies=rate_limited("user:reset_password", 6, 10, auth.get_identifyer_for_limiter))
 async def reset_Password(data: schemas.ResetPassword, session: Session = Depends(get_db_session)):
     statement = select(ResetPassword).select_from(ResetPassword).where(ResetPassword.code == data.code)
     row = session.exec(statement).first()
     if not row:
         raise HTTPException(status_code=401, detail="the uuid does not exist")
-    
-    if  row.ttl < datetime.now():
-        code = session.get(ResetEmailValidation, row.id)
-        session.delete(code)
+
+    if row.ttl < datetime.now():
+        session.delete(row)
         session.commit()
         raise HTTPException(status_code=403, detail="token is expired")
     
